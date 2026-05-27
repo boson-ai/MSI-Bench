@@ -1,0 +1,32 @@
+{
+  "by_domain": {
+    "personal_admin_communication": 500,
+    "public_civic_space": 36,
+    "work_professional": 14
+  },
+  "by_expected_action": {
+    "ignore": 200,
+    "respond": 200,
+    "wait": 150
+  },
+  "by_interaction_class": {
+    "must_ignore": 200,
+    "must_respond": 200,
+    "must_wait": 150
+  },
+  "by_label_confidence": {
+    "inferred": 500,
+    "source": 50
+  },
+  "by_perturbation_family": {
+    "naturalistic": 500,
+    "overlap": 536,
+    "reverb": 50,
+    "semantic_interruption": 81
+  },
+  "by_source": {
+    "HumDial-FDBench": 500,
+    "WearVox": 50
+  },
+  "total_rows": 550
+}

@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Interaction-Bench Manifest Row",
+  "type": "object",
+  "required": ["id", "source", "audio", "scenario", "task", "acoustics", "labels", "split"],
+  "properties": {
+    "id": {"type": "string"},
+    "source": {
+      "type": "object",
+      "required": ["dataset", "license", "path"],
+      "properties": {
+        "dataset": {"type": "string"},
+        "license": {"type": "string"},
+        "path": {"type": "string"},
+        "source_id": {"type": "string"}
+      }
+    },
+    "audio": {
+      "type": "object",
+      "required": ["primary"],
+      "properties": {
+        "primary": {"type": "string"},
+        "multichannel": {"type": ["string", "null"]},
+        "duration_s": {"type": ["number", "null"]},
+        "sample_rate_hz": {"type": ["integer", "null"]},
+        "channels": {"type": ["integer", "null"]}
+      }
+    },
+    "scenario": {
+      "type": "object",
+      "required": ["domain", "interaction_class", "base_id"],
+      "properties": {
+        "domain": {"type": "string"},
+        "interaction_class": {"enum": ["must_respond", "must_ignore", "must_wait", "must_clarify", "must_incorporate"]},
+        "base_id": {"type": ["string", "null"]},
+        "speaker_roles": {"type": "array", "items": {"type": "string"}},
+        "semantic_perturbations": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "task": {
+      "type": "object",
+      "required": ["type", "instruction", "expected_action"],
+      "properties": {
+        "type": {"type": "string"},
+        "instruction": {"type": "string"},
+        "expected_action": {"enum": ["respond", "ignore", "wait", "clarify", "incorporate"]},
+        "ground_truth": {"type": ["string", "null"]},
+        "transcript": {"type": ["string", "null"]}
+      }
+    },
+    "acoustics": {
+      "type": "object",
+      "required": ["perturbation_families"],
+      "properties": {
+        "environment": {"type": ["string", "null"]},
+        "noise_level": {"type": ["string", "null"]},
+        "noise_type": {"type": ["string", "null"]},
+        "location": {"type": ["string", "null"]},
+        "bystander": {"type": ["boolean", "null"]},
+        "perturbation_families": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "labels": {
+      "type": "object",
+      "required": ["label_confidence", "rationale"],
+      "properties": {
+        "label_confidence": {"enum": ["gold", "source", "inferred", "synthetic"]},
+        "rationale": {"type": "string"}
+      }
+    },
+    "split": {"type": "string"},
+    "notes": {"type": "string"}
+  }
+}

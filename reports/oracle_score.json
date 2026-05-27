@@ -1,0 +1,107 @@
+{
+  "answer_exact_match": null,
+  "counts": {
+    "action_correct": 550,
+    "answer_denominator": 0,
+    "answer_exact": 0,
+    "false_engagement": 0,
+    "false_engagement_denominator": 350,
+    "missed_engagement": 0,
+    "missed_engagement_denominator": 200
+  },
+  "engagement_accuracy": 1.0,
+  "extra_prediction_count": 0,
+  "extra_prediction_ids_sample": [],
+  "false_engagement_rate": 0.0,
+  "missed_engagement_rate": 0.0,
+  "missing_prediction_count": 0,
+  "missing_prediction_ids_sample": [],
+  "scored_rows": 550,
+  "slices": {
+    "domain:personal_admin_communication": {
+      "engagement_accuracy": 1.0,
+      "total": 500
+    },
+    "domain:public_civic_space": {
+      "engagement_accuracy": 1.0,
+      "total": 36
+    },
+    "domain:work_professional": {
+      "engagement_accuracy": 1.0,
+      "total": 14
+    },
+    "environment:Indoors": {
+      "engagement_accuracy": 1.0,
+      "total": 14
+    },
+    "environment:None": {
+      "engagement_accuracy": 1.0,
+      "total": 500
+    },
+    "environment:Outdoors": {
+      "engagement_accuracy": 1.0,
+      "total": 36
+    },
+    "expected_action:ignore": {
+      "engagement_accuracy": 1.0,
+      "total": 200
+    },
+    "expected_action:respond": {
+      "engagement_accuracy": 1.0,
+      "total": 200
+    },
+    "expected_action:wait": {
+      "engagement_accuracy": 1.0,
+      "total": 150
+    },
+    "interaction_class:must_ignore": {
+      "engagement_accuracy": 1.0,
+      "total": 200
+    },
+    "interaction_class:must_respond": {
+      "engagement_accuracy": 1.0,
+      "total": 200
+    },
+    "interaction_class:must_wait": {
+      "engagement_accuracy": 1.0,
+      "total": 150
+    },
+    "noise_level:Noisy / Loud": {
+      "engagement_accuracy": 1.0,
+      "total": 36
+    },
+    "noise_level:None": {
+      "engagement_accuracy": 1.0,
+      "total": 500
+    },
+    "noise_level:Quiet": {
+      "engagement_accuracy": 1.0,
+      "total": 14
+    },
+    "perturbation_family:naturalistic": {
+      "engagement_accuracy": 1.0,
+      "total": 500
+    },
+    "perturbation_family:overlap": {
+      "engagement_accuracy": 1.0,
+      "total": 536
+    },
+    "perturbation_family:reverb": {
+      "engagement_accuracy": 1.0,
+      "total": 50
+    },
+    "perturbation_family:semantic_interruption": {
+      "engagement_accuracy": 1.0,
+      "total": 81
+    },
+    "source:HumDial-FDBench": {
+      "engagement_accuracy": 1.0,
+      "total": 500
+    },
+    "source:WearVox": {
+      "engagement_accuracy": 1.0,
+      "total": 50
+    }
+  },
+  "total_manifest_rows": 550
+}
