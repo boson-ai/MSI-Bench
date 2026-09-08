@@ -1,0 +1,13 @@
+# Minimal eval target file: add the OpenAI GA audio models to the leaderboard.
+# gpt-audio / gpt-audio-mini are the GA successors of gpt-4o-audio-preview /
+# gpt-4o-mini-audio-preview (the old preview IDs 404 on this account).
+# Both are API models (no GPU). Judge with openrouter/deepseek-v4-pro to match
+# every existing EN/CN leaf. Suites: logic_preview_20260716 (EN, fixed testcases)
+# and zh_fanp_merged576_20260720 (CN).
+base:
+  - name: gpt-audio
+    provider: openai
+    model: gpt-audio
+  - name: gpt-audio-mini
+    provider: openai
+    model: gpt-audio-mini

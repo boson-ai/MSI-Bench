@@ -1,0 +1,6 @@
+# ib eval targets served by the voxtral-small-24b Slurm job.
+base:
+  - name: voxtral-small-24b
+    provider: local
+    model: Voxtral-Small-24B-2507
+    checkpoint_path: <models-root>/Voxtral-Small-24B-2507

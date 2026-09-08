@@ -1,0 +1,117 @@
+# MSI-Bench eval model declaration.
+# base: entries run turn_based only.
+# live: entries run both their base turn_based model and fullduplex live model.
+# GPT Realtime 2-family entries pin reasoning_effort per registered target.
+# Gemini dagger variants enable thinking; matching plain variants disable it.
+base:
+  - name: gemini:base
+    provider: gemini
+    model: gemini-3.5-flash
+  - name: gpt-audio
+    provider: openai
+    model: gpt-audio
+  - name: gpt-4o-audio-baseline
+    provider: openai
+    model: gpt-4o-audio-preview
+  - name: gpt-audio-mini
+    provider: openai
+    model: gpt-audio-mini
+  - name: gpt-4o-mini-audio
+    provider: openai
+    model: gpt-4o-mini-audio-preview
+  - name: gemini-3-flash-thinking
+    provider: gemini
+    model: gemini-3-flash-preview
+    thinking_mode: enabled
+  - name: gemini-3-flash
+    provider: gemini
+    model: gemini-3-flash-preview
+    thinking_mode: disabled
+  - name: gemini-2.5-flash-thinking
+    provider: gemini
+    model: gemini-2.5-flash
+    thinking_mode: enabled
+  - name: gemini-2.5-flash
+    provider: gemini
+    model: gemini-2.5-flash
+    thinking_mode: disabled
+  - name: gemini-3.1-pro-thinking
+    provider: gemini
+    model: gemini-3.1-pro-preview
+    thinking_mode: enabled
+  - name: gemini-2.5-pro-thinking
+    provider: gemini
+    model: gemini-2.5-pro
+    thinking_mode: enabled
+live:
+  - name: gpt-realtime-1.5
+    base:
+      provider: openai
+      model: gpt-audio-1.5
+    live:
+      provider: openai_realtime
+      model: gpt-realtime-1.5
+  - name: gpt-realtime-2-medium
+    base:
+      provider: openai
+      model: gpt-audio-1.5
+    live:
+      provider: openai_realtime
+      model: gpt-realtime-2
+      reasoning_effort: medium
+  - name: gpt-realtime-2-xhigh
+    base:
+      provider: openai
+      model: gpt-audio-1.5
+    live:
+      provider: openai_realtime
+      model: gpt-realtime-2
+      reasoning_effort: xhigh
+  - name: gpt-realtime-2.1-medium
+    base:
+      provider: openai
+      model: gpt-audio-1.5
+    live:
+      provider: openai_realtime
+      model: gpt-realtime-2.1
+      reasoning_effort: medium
+  - name: gpt-realtime-2.1-xhigh
+    base:
+      provider: openai
+      model: gpt-audio-1.5
+    live:
+      provider: openai_realtime
+      model: gpt-realtime-2.1
+      reasoning_effort: xhigh
+  - name: gpt-realtime
+    base:
+      provider: openai
+      model: gpt-audio-1.5
+    live:
+      provider: openai_realtime
+      model: gpt-realtime
+  - name: gpt-realtime-mini
+    base:
+      provider: openai
+      model: gpt-audio-1.5
+    live:
+      provider: openai_realtime
+      model: gpt-realtime-mini
+  - name: gemini-3.1-flash-live
+    base:
+      provider: gemini
+      model: gemini-3-flash-preview
+      thinking_mode: disabled
+    live:
+      provider: gemini_live
+      model: gemini-3.1-flash-live-preview
+      thinking_mode: disabled
+  - name: gemini-3.1-flash-live-thinking
+    base:
+      provider: gemini
+      model: gemini-3-flash-preview
+      thinking_mode: enabled
+    live:
+      provider: gemini_live
+      model: gemini-3.1-flash-live-preview
+      thinking_mode: enabled

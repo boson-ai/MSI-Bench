@@ -1,0 +1,83 @@
+{# Calling spec: render MiMo roles/audio markers; enable_thinking selects text prefix. #}
+{%- if tools %}
+{{- '<|im_start|>system\n' }}
+{%- if messages[0]['role'] == 'system' %}
+{{- messages[0]['content'] }}
+{%- else %}
+{{- 'You are a helpful assistant.' }}
+{%- endif %}
+{{- "\n\n# Tools\n\nYou may call one or more functions to assist with the user query.\n\nYou are provided with function signatures within <tools></tools> XML tags:\n<tools>" }}
+{%- for tool in tools %}
+{{- "\n" }}
+{{- tool | tojson }}
+{%- endfor %}
+{{- "\n</tools>\n\nFor each function call, return a json object with function name and arguments within <tool_call></tool_call> XML tags:\n<tool_call>\n{\"name\": <function-name>, \"arguments\": <args-json-object>}\n</tool_call><|im_end|>\n" }}
+{%- else %}
+{%- if messages[0]['role'] == 'system' %}
+{%- set marker = '<|sosp|><|empty|><|eosp|>' -%}
+{%- set raw = messages[0]['content'] if messages[0]['content'] is string else '' -%}
+{%- if marker in raw %}
+{%- set text = (raw | replace(marker ~ '\n', '') | replace(marker, '') | trim) -%}
+{{- '<|im_start|>system\n' + (text ~ marker if text else marker) + '<|im_end|>\n' }}
+{%- else %}
+{{- '<|im_start|>system\n' + raw + '<|im_end|>\n' }}
+{%- endif %}
+{%- else %}
+{{- '<|im_start|>system\nYou are a helpful assistant.<|im_end|>\n' }}
+{%- endif %}
+{%- endif %}
+{%- for message in messages %}
+{%- if message['role'] == 'assistant' %}
+{{- '<|im_start|>assistant' }}
+{%- set marker = '<|sosp|><|empty|><|eosp|>' -%}
+{%- set text = message['content'] if message['content'] is string else '' -%}
+{%- if marker in text %}
+{%- set clean = text | replace(marker, '') -%}
+{%- set body = clean[1:] if (clean and clean[0] == '\n') else clean -%}
+{{- '\n<|sostm|>' + body + '<|eot|><|empty|><|eostm|>' }}
+{%- else %}
+{%- set body = text[1:] if (text and text[0] == '\n') else text -%}
+{{- '\n<|sostm|>' + body + '<|eot|><|eostm|>' }}
+{%- endif %}
+{{- '<|im_end|>\n' }}
+{%- elif message['role'] == 'user' %}
+{%- set marker = '<|sosp|><|empty|><|eosp|>' -%}
+{%- set raw = message['content'] if message['content'] is string else '' -%}
+{%- if marker in raw %}
+{%- set text = (raw | replace(marker ~ '\n', '') | replace(marker, '') | trim) -%}
+{{- '<|im_start|>user\n' + (text ~ marker if text else marker) + '<|im_end|>\n' }}
+{%- else %}
+{{- '<|im_start|>user\n' + raw + '<|im_end|>\n' }}
+{%- endif %}
+{%- elif message['role'] == 'system' and not loop.first %}
+{%- set marker = '<|sosp|><|empty|><|eosp|>' -%}
+{%- set raw = message['content'] if message['content'] is string else '' -%}
+{%- if marker in raw %}
+{%- set text = (raw | replace(marker ~ '\n', '') | replace(marker, '') | trim) -%}
+{{- '<|im_start|>system\n' + (text ~ marker if text else marker) + '<|im_end|>\n' }}
+{%- else %}
+{{- '<|im_start|>system\n' + raw + '<|im_end|>\n' }}
+{%- endif %}
+{%- elif message['role'] == 'tool' %}
+{%- if (loop.index0 == 0) or (messages[loop.index0 - 1]['role'] != 'tool') %}
+{{- '<|im_start|>user' }}
+{%- endif %}
+{%- set raw = message['content'] if message['content'] is string else '' -%}
+{{- '\n<tool_response>\n' + raw + '\n</tool_response>' }}
+{%- if loop.last or (messages[loop.index0 + 1]['role'] != 'tool') %}
+{{- '<|im_end|>\n' }}
+{%- endif %}
+{%- endif %}
+{%- endfor %}
+{%- if add_generation_prompt %}
+{{- '<|im_start|>assistant\n' }}
+{%- if enable_thinking is defined %}
+{%- if enable_thinking %}
+{{- '<think>\n' }}
+{%- else %}
+{{- '<think>\n\n</think>\n' }}
+{%- endif %}
+{%- else %}
+{{- '<|sostm|>' }}
+{%- endif %}
+{%- endif %}

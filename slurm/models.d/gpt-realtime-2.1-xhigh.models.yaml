@@ -1,0 +1,9 @@
+# ib eval targets for the gpt-realtime-2.1 xhigh fullduplex run.
+# live-only: the shared turn_based control (gpt-audio-1.5) already runs
+# under its own output root, so no base: block here.
+live:
+  - name: gpt-realtime-2.1-xhigh
+    live:
+      provider: openai_realtime
+      model: gpt-realtime-2.1
+      reasoning_effort: xhigh

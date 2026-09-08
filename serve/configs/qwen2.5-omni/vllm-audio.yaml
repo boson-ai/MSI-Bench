@@ -1,0 +1,16 @@
+# Calling spec: vllm serve --config /config/vllm-audio.yaml
+# Serves Qwen2.5 Omni thinker output as text.
+model: /models/Qwen2.5-Omni-7B
+served-model-name: Qwen2.5-Omni-7B
+tensor-parallel-size: 1
+dtype: bfloat16
+trust-remote-code: true
+max-model-len: 32768
+gpu-memory-utilization: 0.85
+limit-mm-per-prompt: '{"audio": 2000}'
+host: 0.0.0.0
+port: 8000
+enable-auto-tool-choice: true
+tool-call-parser: hermes
+disable-log-stats: true
+uvicorn-log-level: error

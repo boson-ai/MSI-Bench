@@ -1,0 +1,8 @@
+# Minimal eval target: gpt-audio-1.5 turn_based only (the realtime family's
+# shared turn-based control). Used for the zh backfill run so the CN board
+# matches the EN roster; judge with openrouter/deepseek-v4-pro like every
+# existing EN/CN leaf.
+base:
+  - name: gpt-audio-1.5
+    provider: openai
+    model: gpt-audio-1.5

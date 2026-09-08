@@ -1,0 +1,12 @@
+# Calling spec: enroot start --rc slurm/enroot_exec.rc <container> <command...>
+# Neutral rc that runs the given command verbatim, bypassing the image's
+# baked-in `vllm serve` entrypoint while keeping its rc.local environment hook.
+if [ -s /etc/rc.local ]; then
+    . /etc/rc.local
+fi
+
+if [ $# -gt 0 ]; then
+    exec "$@"
+else
+    exec /bin/bash
+fi

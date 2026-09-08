@@ -1,0 +1,8 @@
+# ib eval targets for the Boson higgs-realtime fullduplex run.
+# live-only: no turn_based base pairing; audio input is fed over the Boson
+# Realtime WebSocket (see src/ib/scoring/boson_fullduplex.py for protocol notes).
+live:
+  - name: higgs-realtime
+    live:
+      provider: boson_realtime
+      model: higgs-realtime

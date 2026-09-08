@@ -1,0 +1,21 @@
+# Calling spec: vllm serve --config /config/vllm-audio.yaml
+# Serves Phi-4 Multimodal with its speech and vision LoRA adapters.
+model: /models/Phi-4-multimodal-instruct
+served-model-name: Phi-4-multimodal-instruct
+dtype: auto
+trust-remote-code: true
+max-model-len: 8192
+gpu-memory-utilization: 0.85
+enable-lora: true
+max-lora-rank: 320
+max-loras: 2
+lora-modules:
+  - speech=/models/Phi-4-multimodal-instruct/speech-lora
+  - vision=/models/Phi-4-multimodal-instruct/vision-lora
+limit-mm-per-prompt: '{"audio": 2000}'
+host: 0.0.0.0
+port: 8000
+enable-auto-tool-choice: true
+tool-call-parser: phi4_mini_json
+disable-log-stats: true
+uvicorn-log-level: error

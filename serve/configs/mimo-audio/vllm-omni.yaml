@@ -1,0 +1,12 @@
+# Calling spec: vllm serve --config /config/vllm-omni.yaml --omni
+# Serves MiMo comprehension only; chat_template_kwargs controls thinking.
+model: /models/MiMo-Audio-7B-Instruct
+served-model-name: MiMo-Audio-7B-Instruct
+tensor-parallel-size: 1
+gpu-memory-utilization: 0.7
+max-model-len: 8192
+trust-remote-code: true
+stage-configs-path: /config/mimo_audio_understanding.yaml
+chat-template: /config/chat_template.jinja
+host: 0.0.0.0
+port: 8000
