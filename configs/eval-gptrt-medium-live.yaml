@@ -1,0 +1,9 @@
+# ib eval target for gpt-realtime-2.1 medium fullduplex, live-only.
+# No base: block — the shared turn_based control (gpt-audio-1.5) runs under its
+# own output root; mirrors slurm/models.d/gpt-realtime-2.1-xhigh.models.yaml.
+live:
+  - name: gpt-realtime-2.1-medium
+    live:
+      provider: openai_realtime
+      model: gpt-realtime-2.1
+      reasoning_effort: medium

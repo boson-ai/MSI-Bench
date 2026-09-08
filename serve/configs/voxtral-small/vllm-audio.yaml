@@ -1,0 +1,18 @@
+# Calling spec: vllm serve --config /config/vllm-audio.yaml
+# Serves Voxtral Small audio chat without system-role prompts.
+model: /models/Voxtral-Small-24B-2507
+served-model-name: Voxtral-Small-24B-2507
+tensor-parallel-size: 2
+gpu-memory-utilization: 0.85
+max-model-len: 32768
+tokenizer-mode: mistral
+config-format: mistral
+load-format: mistral
+tool-call-parser: mistral
+enable-auto-tool-choice: true
+trust-remote-code: true
+limit-mm-per-prompt: '{"audio": 2000}'
+host: 0.0.0.0
+port: 8000
+disable-log-stats: true
+uvicorn-log-level: error

@@ -1,0 +1,13 @@
+# Calling spec: vllm serve --config /config/vllm-audio.yaml
+# Serves Qwen2 Audio text-out/audio-in.
+model: /models/Qwen2-Audio-7B-Instruct
+served-model-name: Qwen2-Audio-7B-Instruct
+tensor-parallel-size: 1
+dtype: bfloat16
+host: 0.0.0.0
+port: 8000
+max-num-seqs: 8
+limit-mm-per-prompt: '{"audio": 2000}'
+disable-log-requests: false
+disable-log-stats: true
+uvicorn-log-level: error

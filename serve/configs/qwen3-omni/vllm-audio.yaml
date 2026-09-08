@@ -1,0 +1,13 @@
+model: /models/Qwen3-Omni-30B-A3B-Instruct
+served-model-name: Qwen3-Omni-30B-A3B-Instruct
+tensor-parallel-size: 1
+dtype: bfloat16
+trust-remote-code: true
+max-model-len: 32768
+gpu-memory-utilization: 0.85
+max-num-seqs: 16
+limit-mm-per-prompt: '{"audio": 2000}'
+host: 0.0.0.0
+port: 8000
+disable-log-stats: true
+uvicorn-log-level: error

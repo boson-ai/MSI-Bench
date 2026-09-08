@@ -1,0 +1,7 @@
+# ib eval target for the gemini-3.1-pro thinking turn_based run.
+# Mirrors the gemini-3.1-pro-thinking entry in configs/eval-models.yaml.
+base:
+  - name: gemini-3.1-pro-thinking
+    provider: gemini
+    model: gemini-3.1-pro-preview
+    thinking_mode: enabled

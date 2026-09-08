@@ -1,0 +1,13 @@
+# ib eval targets served by the gemma4-12b Slurm job.
+# Thinking is a request-level chat_template_kwargs toggle; one server covers both.
+base:
+  - name: gemma-4-12b-instruct-thinking
+    provider: local
+    model: gemma-4-12B-it
+    checkpoint_path: /ceph/models/gemma-4-12B-it
+    thinking_mode: enabled
+  - name: gemma-4-12b-instruct
+    provider: local
+    model: gemma-4-12B-it
+    checkpoint_path: /ceph/models/gemma-4-12B-it
+    thinking_mode: disabled

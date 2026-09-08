@@ -1,0 +1,6 @@
+# ib eval targets served by the qwen2-audio Slurm job.
+base:
+  - name: qwen2-audio-7b
+    provider: local
+    model: Qwen2-Audio-7B-Instruct
+    checkpoint_path: /ceph/models/Qwen2-Audio-7B-Instruct

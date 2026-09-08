@@ -1,0 +1,10 @@
+# ib eval targets served by the mimo-audio-text Slurm job.
+# Transcript-input (local_text) twin of mimo-audio-7b-thinking. Kept split
+# from the plain variant to mirror the audio jobs (repeat-audio 400 bug is
+# audio-only, but the 1:1 mirror keeps the harness path known-good).
+base:
+  - name: mimo-audio-7b-thinking-text
+    provider: local_text
+    model: MiMo-Audio-7B-Instruct
+    checkpoint_path: /ceph/models/MiMo-Audio-7B-Instruct
+    thinking_mode: enabled

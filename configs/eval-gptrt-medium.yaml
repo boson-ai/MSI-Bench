@@ -1,0 +1,10 @@
+# gpt-realtime-2.1-medium re-prediction for the 2 AM/PM-fixed zh cells.
+live:
+  - name: gpt-realtime-2.1-medium
+    base:
+      provider: openai
+      model: gpt-audio-1.5
+    live:
+      provider: openai_realtime
+      model: gpt-realtime-2.1
+      reasoning_effort: medium

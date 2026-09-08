@@ -1,0 +1,16 @@
+# Calling spec: vllm serve --config /config/vllm-gemma4.yaml
+# Serves Gemma 4 12B text-out/audio-in; request-level kwargs select thinking.
+model: /models/gemma-4-12B-it
+served-model-name: gemma-4-12B-it
+tensor-parallel-size: 1
+gpu-memory-utilization: 0.9
+max-model-len: 32768
+max-num-seqs: 1
+limit-mm-per-prompt: '{"image": 4, "audio": 13}'
+kv-sharing-fast-prefill: true
+trust-remote-code: true
+default-chat-template-kwargs: '{"enable_thinking": false}'
+host: 0.0.0.0
+port: 8000
+disable-log-stats: true
+uvicorn-log-level: error

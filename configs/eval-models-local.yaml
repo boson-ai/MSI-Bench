@@ -1,0 +1,51 @@
+# MSI-Bench opt-in local audio model declarations.
+# Start the matching service under serve/ before running this file.
+# checkpoint_path entries are skipped when the local checkpoint is absent.
+# Dagger variants use thinking_mode: enabled; matching plain variants disable it.
+# Kimi is registered for inventory/serving, but the evaluator fails closed because
+# its current vLLM route is transcription-only and cannot produce benchmark decisions.
+base:
+  - name: gemma-4-12b-instruct-thinking
+    provider: local
+    model: gemma-4-12B-it
+    checkpoint_path: /ceph/models/gemma-4-12B-it
+    thinking_mode: enabled
+  - name: gemma-4-12b-instruct
+    provider: local
+    model: gemma-4-12B-it
+    checkpoint_path: /ceph/models/gemma-4-12B-it
+    thinking_mode: disabled
+  - name: mimo-audio-7b-thinking
+    provider: local
+    model: MiMo-Audio-7B-Instruct
+    checkpoint_path: /ceph/models/MiMo-Audio-7B-Instruct
+    thinking_mode: enabled
+  - name: mimo-audio-7b
+    provider: local
+    model: MiMo-Audio-7B-Instruct
+    checkpoint_path: /ceph/models/MiMo-Audio-7B-Instruct
+    thinking_mode: disabled
+  - name: voxtral-small-24b
+    provider: local
+    model: Voxtral-Small-24B-2507
+    checkpoint_path: /ceph/models/Voxtral-Small-24B-2507
+  - name: qwen3-omni-30b
+    provider: local
+    model: Qwen3-Omni-30B-A3B-Instruct
+    checkpoint_path: /ceph/models/Qwen3-Omni-30B-A3B-Instruct
+  - name: kimi-audio-7b
+    provider: local
+    model: Kimi-Audio-7B-Instruct
+    checkpoint_path: /ceph/models/Kimi-Audio-7B-Instruct
+  - name: qwen2.5-omni-7b
+    provider: local
+    model: Qwen2.5-Omni-7B
+    checkpoint_path: /ceph/models/Qwen2.5-Omni-7B
+  - name: phi-4-multimodal
+    provider: local
+    model: Phi-4-multimodal-instruct
+    checkpoint_path: /ceph/models/Phi-4-multimodal-instruct
+  - name: qwen2-audio-7b
+    provider: local
+    model: Qwen2-Audio-7B-Instruct
+    checkpoint_path: /ceph/models/Qwen2-Audio-7B-Instruct

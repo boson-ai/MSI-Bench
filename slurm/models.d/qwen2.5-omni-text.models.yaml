@@ -1,0 +1,6 @@
+# ib eval targets served by the qwen2.5-omni-text Slurm job.
+base:
+  - name: qwen2.5-omni-7b-text
+    provider: local_text
+    model: Qwen2.5-Omni-7B
+    checkpoint_path: /ceph/models/Qwen2.5-Omni-7B

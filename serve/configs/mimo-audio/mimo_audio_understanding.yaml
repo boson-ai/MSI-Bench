@@ -1,0 +1,35 @@
+# Calling spec: referenced by vllm-omni.yaml as a single comprehension stage.
+# Input is audio/text; output is text only.
+async_chunk: false
+stage_args:
+  - stage_id: 0
+    stage_type: llm
+    runtime:
+      process: true
+      devices: "0"
+    engine_args:
+      dtype: bfloat16
+      max_num_seqs: 1
+      model_stage: fused_thinker_talker
+      model_arch: MiMoAudioForConditionalGeneration
+      worker_type: ar
+      scheduler_cls: vllm_omni.core.sched.omni_ar_scheduler.OmniARScheduler
+      tensor_parallel_size: 1
+      gpu_memory_utilization: 0.7
+      enforce_eager: true
+      trust_remote_code: true
+      enable_prefix_caching: false
+      engine_output_type: latent
+      max_model_len: 8192
+      max_num_batched_tokens: 8192
+    is_comprehension: true
+    final_output: true
+    final_output_type: text
+    default_sampling_params:
+      temperature: 0.6
+      top_p: 0.95
+      top_k: 50
+      max_tokens: 8192
+      seed: 42
+      detokenize: true
+      repetition_penalty: 1.1

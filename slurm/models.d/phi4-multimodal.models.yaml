@@ -1,0 +1,6 @@
+# ib eval targets served by the phi4-multimodal Slurm job.
+base:
+  - name: phi-4-multimodal
+    provider: local
+    model: Phi-4-multimodal-instruct
+    checkpoint_path: /ceph/models/Phi-4-multimodal-instruct

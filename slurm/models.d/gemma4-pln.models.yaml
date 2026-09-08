@@ -1,0 +1,7 @@
+# gemma-4-12B thinking-disabled (plain) only.
+base:
+  - name: gemma-4-12b-instruct
+    provider: local
+    model: gemma-4-12B-it
+    checkpoint_path: /ceph/models/gemma-4-12B-it
+    thinking_mode: disabled

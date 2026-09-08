@@ -1,0 +1,5 @@
+# gpt-audio only (self-prefill run; gpt-audio-mini not in the selected roster).
+base:
+  - name: gpt-audio
+    provider: openai
+    model: gpt-audio

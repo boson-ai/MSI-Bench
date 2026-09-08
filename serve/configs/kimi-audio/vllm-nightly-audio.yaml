@@ -1,0 +1,12 @@
+model: /models/Kimi-Audio-7B-Instruct
+served-model-name: Kimi-Audio-7B-Instruct
+tensor-parallel-size: 1
+gpu-memory-utilization: 0.85
+max-model-len: 8192
+trust-remote-code: true
+chat-template: /config/chat_template.jinja
+limit-mm-per-prompt: '{"audio": 2000}'
+host: 0.0.0.0
+port: 8000
+disable-log-stats: true
+uvicorn-log-level: error

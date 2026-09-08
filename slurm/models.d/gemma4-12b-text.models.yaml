@@ -1,0 +1,13 @@
+# ib eval targets served by the gemma4-12b-text Slurm job.
+# Transcript-input (local_text) twins of the gemma4 audio targets.
+base:
+  - name: gemma-4-12b-instruct-thinking-text
+    provider: local_text
+    model: gemma-4-12B-it
+    checkpoint_path: /ceph/models/gemma-4-12B-it
+    thinking_mode: enabled
+  - name: gemma-4-12b-instruct-text
+    provider: local_text
+    model: gemma-4-12B-it
+    checkpoint_path: /ceph/models/gemma-4-12B-it
+    thinking_mode: disabled

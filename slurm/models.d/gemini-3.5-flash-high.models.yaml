@@ -1,0 +1,7 @@
+# ib eval target for the gemini-3.5-flash high-thinking turn_based run.
+# thinking_mode: enabled maps to ThinkingLevel.HIGH for gemini-3.5 models.
+base:
+  - name: gemini-3.5-flash-high
+    provider: gemini
+    model: gemini-3.5-flash
+    thinking_mode: enabled
