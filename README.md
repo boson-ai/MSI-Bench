@@ -3,9 +3,8 @@
 Evaluation code for **MSI-Bench** (Multi-Speaker Interaction Benchmark): the
 prediction runners, deterministic scoring, LLM answer judge, and the table
 aggregation used in the paper *MSI-Bench: Evaluating Multi-Speaker Voice
-Interaction for Collaborative AI Agents* (arXiv: TODO). The dataset lives at
-https://huggingface.co/datasets/M2cha4l1124/MSI-Bench; the dataset-construction pipeline is not part of this
-repository.
+Interaction for Collaborative AI Agents*. The dataset lives at
+https://huggingface.co/datasets/M2cha4l1124/MSI-Bench.
 
 ## Layout
 
