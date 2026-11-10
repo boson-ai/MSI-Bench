@@ -1,0 +1,1014 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MSI-Bench</title>
+<style>
+* { box-sizing: border-box; }
+.wrap { max-width: 1120px; margin: 0 auto; display: grid; gap: 22px; }
+.eyebrow { font: 500 12px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+h1 { font: 600 clamp(26px, 4vw, 38px)/1.1 var(--cond); margin: 6px 0 0; letter-spacing: -.01em; }
+.facts { display: flex; flex-wrap: wrap; gap: 8px 22px; font: 13px/1.4 var(--mono); color: var(--muted); }
+.facts b { color: var(--ink); font-weight: 500; }
+.top { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+.langsw { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; padding: 3px; background: var(--surface); }
+.langsw button { font: 500 13px/1 var(--sans); border: 0; background: none; color: var(--muted); padding: 8px 14px; border-radius: 999px; cursor: pointer; }
+.langsw button[aria-pressed="true"] { background: var(--ink); color: var(--ground); }
+.langsw .n { font: 12px var(--mono); opacity: .75; margin-left: 4px; }
+.filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.filters select { font: inherit; font-size: 14px; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 4px; padding: 6px 8px; }
+.pager { display: flex; align-items: center; justify-content: center; gap: 12px; font: 13px var(--mono); color: var(--muted); }
+.pager button { font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 4px; padding: 6px 12px; cursor: pointer; }
+.pager button:disabled { opacity: .4; cursor: default; }
+section.case.pending { min-height: 220px; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13px; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.sw { width: 22px; height: 10px; border-radius: 2px; display: inline-block; }
+section.case { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+section.case[hidden] { display: none; }
+.chead { padding: 16px 20px 12px; display: grid; gap: 8px; border-bottom: 1px solid var(--line); }
+.chead h2 { font: 600 20px/1.25 var(--cond); margin: 0; }
+.chead h2 small { font: 400 13px var(--mono); color: var(--muted); margin-left: 8px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font: 12px/1 var(--mono); padding: 5px 9px; border-radius: 999px; background: var(--track); color: var(--muted); }
+.chip.on { background: var(--accent-soft); color: var(--accent); }
+.chip.bgc { background: var(--bg-soft); color: var(--bg); }
+.bar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 20px; border-bottom: 1px solid var(--line); }
+.tabs { display: flex; flex-wrap: wrap; gap: 4px; position: relative; }
+.tabs button, .play { font: 500 13px/1 var(--sans); border: 1px solid var(--line); background: var(--ground); color: var(--muted); padding: 8px 12px; border-radius: 4px; cursor: pointer; }
+.tabs button { position: relative; z-index: 1; background: transparent; transition: color .35s ease, border-color .35s ease; }
+.tabs button[aria-pressed="true"] { color: var(--surface); border-color: var(--ink); }
+.tabs .ind { position: absolute; left: 0; top: 0; border-radius: 4px; background: var(--ink); pointer-events: none;
+  transition: transform .45s cubic-bezier(.2,.8,.2,1), width .45s cubic-bezier(.2,.8,.2,1), background-color .35s; }
+.tabs .ind.side { background: var(--side); }
+.rate { font: 500 13px/1 var(--mono); color: var(--ink); background: var(--ground); border: 1px solid var(--line); border-radius: 4px; padding: 6px 4px; cursor: pointer; }
+.ctrl { display: flex; align-items: center; gap: 10px; font: 13px var(--mono); color: var(--muted); }
+.play { display: inline-flex; align-items: center; gap: 8px; color: var(--accent); border-color: var(--accent); background: var(--accent-soft); min-width: 84px; justify-content: center; }
+.play::before { content: ""; border-left: 8px solid currentColor; border-top: 5px solid transparent; border-bottom: 5px solid transparent; }
+.play.on::before { width: 8px; height: 10px; border: 0; background: linear-gradient(90deg, currentColor 0 3px, transparent 3px 5px, currentColor 5px); }
+button:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.chans { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; padding: 8px 20px; border-bottom: 1px solid var(--line); font-size: 13px; }
+.chans .lbl { font: 12px var(--mono); color: var(--muted); }
+.chan { display: inline-flex; align-items: center; gap: 5px; }
+.chan .dot { width: 10px; height: 10px; border-radius: 3px; background: var(--c); }
+.chan.off .name { color: var(--muted); text-decoration: line-through; }
+.chan button { font: 600 11px/1 var(--mono); border: 1px solid var(--line); background: var(--ground); color: var(--muted); border-radius: 4px; padding: 4px 6px; min-width: 24px; cursor: pointer; }
+.chan button.m[aria-pressed="true"] { background: var(--side); border-color: var(--side); color: var(--surface); }
+.chan button.s[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--surface); }
+svg .evt.muted { filter: saturate(0) opacity(.3); }
+.fig { padding: 8px 12px 0; overflow-x: auto; }
+.fig svg { width: 100%; min-width: 720px; display: block; }
+svg text { font-family: var(--sans); fill: var(--ink); }
+svg .lbl { font-size: 12.5px; paint-order: stroke; stroke: var(--surface); stroke-width: 4px; stroke-linejoin: round; }
+svg .sub { font: 10.5px var(--mono); fill: var(--muted); paint-order: stroke; stroke: var(--surface); stroke-width: 3px; }
+svg .tick { font: 10.5px var(--mono); fill: var(--muted); }
+svg .arc { fill: none; stroke: var(--line); stroke-width: 1.2; stroke-dasharray: 3 4; }
+svg .ray { stroke-width: 1.6; opacity: .9; }
+svg .link { stroke-width: 1.3; stroke-dasharray: 4 4; opacity: .7; }
+svg .bgarc { stroke: var(--bg); opacity: .5; }
+svg .lane { fill: var(--track); opacity: .6; }
+svg .evt { cursor: pointer; opacity: var(--o, 1); transform-box: fill-box; transform-origin: 0 50%;
+  transition: opacity .45s ease, transform .6s cubic-bezier(.2,.8,.2,1), filter .45s ease; }
+svg .evt.dia { transform-origin: 50% 50%; }
+svg .evt:hover { filter: brightness(1.12); }
+svg .evt.ghost { opacity: .12; filter: grayscale(1); pointer-events: none; }
+svg .evt.off { opacity: 0; transform: scaleX(0); pointer-events: none; }
+svg .evt.dia.off { transform: scale(0); }
+svg .evt.sl:not(.off) { filter: drop-shadow(0 0 3px var(--side)); }
+svg .bmark { stroke: var(--side); stroke-width: 1.2; stroke-dasharray: 3 3; opacity: 0; transition: opacity .4s ease; }
+svg .bmark.on { opacity: .85; transition-delay: .25s; }
+svg .tl-base { fill: none; stroke: var(--line); stroke-width: 2; stroke-linecap: round; }
+svg .tl-base.main { stroke-width: 3.5; }
+svg .tl-hl { fill: none; stroke-width: 3.5; stroke-linecap: round; opacity: 0; transition: opacity .35s ease; }
+svg .tl-hl.on { opacity: 1; }
+svg .tl-flow { fill: none; stroke: var(--surface); stroke-width: 1.3; stroke-dasharray: 2 14; stroke-linecap: round; opacity: 0;
+  transition: opacity .3s ease; animation: flow 1.4s linear infinite; pointer-events: none; }
+svg .tl-flow.on { opacity: .85; transition-delay: .55s; }
+@keyframes flow { to { stroke-dashoffset: -16; } }
+svg .tl-node { fill: var(--surface); stroke: var(--side); stroke-width: 1.6; transition: fill .3s ease; }
+svg .tl-node.on { fill: var(--side); }
+svg .tl-end { fill: var(--surface); stroke: var(--muted); stroke-width: 1.6; transition: fill .3s ease, stroke .3s ease; }
+svg .tl-end.on { fill: var(--c); stroke: var(--c); }
+svg .tl-pulse { opacity: 0; transform-box: fill-box; transform-origin: 50% 50%; pointer-events: none; }
+svg .tl-pulse.on { animation: pulse 1.8s ease-out .5s infinite; }
+@keyframes pulse { 0% { opacity: .55; transform: scale(.6); } 100% { opacity: 0; transform: scale(2.6); } }
+svg .tl-hit { fill: none; stroke: transparent; stroke-width: 16; cursor: pointer; pointer-events: stroke; }
+svg .tl-lbl { font: 11.5px var(--mono); fill: var(--muted); cursor: pointer; transition: fill .3s ease;
+  paint-order: stroke; stroke: var(--surface); stroke-width: 3px; stroke-linejoin: round; }
+svg .tl-lbl.on { fill: var(--ink); font-weight: 500; }
+svg .playhead { stroke: var(--ink); stroke-width: 1.5; }
+svg .mic { fill: var(--ink); }
+.trans { border-top: 1px solid var(--line); max-height: 340px; overflow-y: auto; }
+.tr { display: grid; grid-template-columns: 64px 118px 1fr; gap: 10px; padding: 6px 20px; border-left: 3px solid transparent; cursor: pointer; font-size: 14px;
+  max-height: 260px; overflow: hidden; transition: max-height .45s ease, opacity .35s ease, padding .45s ease, background-color .3s ease; }
+.tr.gone { max-height: 0; opacity: 0; padding-block: 0; pointer-events: none; }
+.tr:hover { background: var(--ground); }
+.tr .t { font: 12px/1.9 var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.tr .who { font-weight: 600; display: flex; align-items: center; gap: 6px; min-width: 0; overflow-wrap: anywhere; }
+.tr .who i { font: normal 11px var(--mono); color: var(--muted); font-weight: 400; }
+.tr .dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+.tr.bg { color: var(--bg); background: color-mix(in srgb, var(--bg-soft) 45%, transparent); }
+.tr.overlay { font-style: italic; color: var(--muted); }
+.tr.side { background: color-mix(in srgb, var(--side) 9%, transparent); }
+.tr.asst { color: var(--muted); }
+.tr.think { font-style: italic; color: var(--think); }
+.tr.now { border-left-color: var(--accent); background: color-mix(in srgb, var(--accent-soft) 70%, transparent); }
+.tr .w { border-radius: 3px; transition: background-color .08s, color .08s; }
+.tr.now .w.past { color: var(--ink); }
+.tr.now .txt { color: var(--muted); }
+.tr .w.on { background: var(--accent); color: var(--surface); box-shadow: 0 0 0 2px var(--accent); }
+.tag { font: 11px/1 var(--mono); padding: 3px 6px; border-radius: 3px; margin-right: 6px; white-space: nowrap; }
+.tag.bg { background: var(--bg); color: var(--surface); }
+.tag.solo { background: var(--bg); color: var(--surface); box-shadow: 0 0 0 2px var(--bg-soft); }
+.tag.side { background: var(--side); color: #fff; }
+.tag.ov { background: var(--track); color: var(--muted); }
+.tag.th { background: var(--think); color: var(--surface); font-style: normal; }
+details.tgt { padding: 10px 20px 16px; border-top: 1px solid var(--line); }
+details.tgt summary { cursor: pointer; font: 600 14px var(--cond); }
+.tgt .body { display: grid; gap: 6px; margin-top: 8px; font-size: 14px; }
+.tgt .k { font: 11px var(--mono); color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+.tgt code { font: 13px var(--mono); background: var(--ground); border: 1px solid var(--line); border-radius: 4px; padding: 6px 8px; display: block; overflow-wrap: anywhere; white-space: pre-wrap; }
+.note { font-size: 13px; color: var(--muted); padding: 0 20px 10px; }
+.tgt .sysp { font: 13px/1.6 var(--mono); background: var(--ground); border: 1px solid var(--line); border-radius: 4px; padding: 8px 10px; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 360px; overflow: auto; }
+.tgt .ref { display: inline-flex; align-items: center; gap: 6px; vertical-align: middle; white-space: nowrap; padding: 2px 6px; margin: 2px 0; border-radius: 4px; background: var(--accent-soft); color: var(--accent); }
+.tgt .ref audio { height: 26px; width: 180px; }
+.case.instant *, .case.instant *::before { transition: none !important; }
+@media (prefers-reduced-motion: reduce) {
+  .case *, .case *::before { transition: none !important; animation: none !important; }
+}
+@media (max-width: 640px) {
+  .tr { grid-template-columns: 52px 1fr; }
+  .tr .txt { grid-column: 1 / -1; }
+  .chead, .bar { padding-inline: 14px; }
+}
+.legend .lg-floor { display: none; }
+body.has-floor .legend .lg-floor { display: inline-flex; }
+svg .tlab { font: 10px var(--mono); fill: var(--muted); }
+svg .tlab.stop { fill: var(--accent); font-weight: 500; }
+.tr.floor { color: var(--muted); }
+.tag.fl { background: var(--track); color: var(--ink); }
+.tag.cut { color: var(--side); box-shadow: inset 0 0 0 1px var(--side); }
+.fsum { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 4px; font: 12px/1.6 var(--mono); }
+.fsum b { color: var(--ink); font-weight: 500; }
+.fsum .k { color: var(--ink); font-weight: 500; }
+.fsum .k:not(:first-child) { margin-left: 8px; }
+.fsum .drop { text-decoration: underline dotted; cursor: help; }
+</style>
+<link rel="icon" type="image/png" sizes="192x192" href="assets/img/favicon-192.png">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+<header class="site-header">
+  <a class="site-logo" href="https://www.boson.ai/" aria-label="Boson AI">
+    <img class="wide" src="assets/img/logo.svg" alt="Boson AI" width="322" height="25">
+    <img class="narrow" src="assets/img/logo-compact.svg" alt="Boson AI" width="134" height="27">
+  </a>
+</header>
+<div class="article">
+<div class="wrap">
+  <header class="blog-header">
+    <h1 class="blog-header-title">MSI-Bench</h1>
+  </header>
+  <section class="copy">
+    <p>Voice is a natural interface for AI agents, and many of the places where a voice agent is useful, such as meetings, households and collaborative work, are inherently multi-speaker. MSI-Bench (Multi-Speaker Interaction Benchmark) evaluates a voice assistant in exactly these settings. Each test case is a short multi-party, multi-turn audio scene with two to four speakers, a system prompt that names no one, expected tool calls and atomic rubrics. The benchmark targets three capability families: multi-speaker memory, multi-speaker instruction following and multi-speaker reasoning. The cases are evenly split between Mandarin Chinese and English.</p>
+    <p>The assistant must tell the speakers apart by voice alone, learn who may authorize what from how people talk, keep a whispered secret from the others, pick up a fact said far away on the phone, attribute interleaved constraints to the right person, weigh a hard constraint against a soft wish and decide when to answer at all. The scenes are grounded in situation-rich seeds and include a full-duplex floor layer: backchannels, interruptions, cut tails and earlier assistant turns in the assistant's own voice. Each case below shows the heard audio, the lanes, the transcript, the system prompt, the gold and the rubric.</p>
+  </section>
+  <header class="demo-top">
+    <div class="langsw" role="group" aria-label="Case language">
+      <button type="button" data-lang="en" aria-pressed="true">English</button>
+      <button type="button" data-lang="zh" aria-pressed="false">Chinese</button>
+    </div>
+    <div class="legend">
+      <span><span class="sw" style="background:var(--c1)"></span><span data-i="lgMain"></span></span>
+      <span class="lg-side"><span class="sw" style="background:var(--c2);outline:2px solid var(--side)"></span><span data-i="lgSide"></span></span>
+      <span class="lg-overlay"><span class="sw" style="background:repeating-linear-gradient(45deg,var(--muted) 0 3px,transparent 3px 6px)"></span><span data-i="lgOverlay"></span></span>
+      <span class="lg-bg"><span class="sw" style="background:var(--bg);opacity:.45"></span><span data-i="lgBg"></span></span>
+      <span class="lg-side"><svg width="30" height="12" aria-hidden="true"><path d="M1,3 H11 C16,3 13,10 19,10 H29" fill="none" stroke="var(--side)" stroke-width="2"/></svg><span data-i="lgBranch"></span></span>
+      <span data-i="lgMarks"></span>
+      <span class="lg-floor"><svg width="30" height="12" aria-hidden="true"><rect x="2" y="3" width="26" height="6" rx="2" fill="var(--c2)"/></svg><span data-i="lgFBack"></span></span>
+      <span class="lg-floor"><svg width="30" height="12" aria-hidden="true"><rect x="2" y="1" width="26" height="10" rx="2" fill="none" stroke="var(--c2)" stroke-width="1.6"/></svg><span data-i="lgFFail"></span></span>
+      <span class="lg-floor"><svg width="30" height="12" aria-hidden="true"><rect x="8" y="5" width="20" height="7" rx="2" fill="var(--c2)"/><path d="M4,0 h8 l-4,5z" fill="var(--side)"/></svg><span data-i="lgFLead"></span></span>
+      <span class="lg-floor"><svg width="30" height="12" aria-hidden="true"><rect x="2" y="1" width="24" height="10" rx="2" fill="var(--c2)" opacity=".38"/><path d="M26,0 V12" stroke="var(--side)" stroke-width="2.2"/></svg><span data-i="lgFTail"></span></span>
+      <span class="lg-floor"><svg width="30" height="12" aria-hidden="true"><rect x="2" y="1" width="26" height="10" rx="2" fill="var(--c1)"/><rect x="12" y="1" width="6" height="10" fill="var(--surface)" stroke="var(--c1)" stroke-dasharray="2 2"/></svg><span data-i="lgFHold"></span></span>
+      <span class="lg-floor"><svg width="30" height="12" aria-hidden="true"><path d="M8,0 l6,6 l-6,6 l-6,-6z" fill="var(--ink)"/><path d="M22,0 l6,6 l-6,6 l-6,-6z" fill="var(--accent)"/></svg><span data-i="lgFTarget"></span></span>
+    </div>
+  </header>
+  <main id="cases"></main>
+</div>
+</div>
+<footer class="site-footer">
+  <img src="assets/img/logo.svg" alt="Boson AI" width="322" height="25">
+  <p class="tagline">Making communication with AI as easy, natural and fun as talking to a human.</p>
+</footer>
+<script>
+const DATA = {"index": "data/index.json", "patterns": [["distributed_parameters", "Scope tracking", "Different speakers contribute global and local constraints to one shared task. A global constraint binds the whole group, a local one only certain individuals. Each constraint stays with its holder and scope."], ["disclosure_clause_in_instruction", "Selective disclosure", "Earlier speech tells the assistant which facts to withhold and from which audience. The facts come from the assistant's prior memory or are stated aloud. When the protected audience probes, the assistant withholds the values while preserving any legitimate non-disclosing action commissioned earlier."], ["eavesdropping", "Background speech retrieval", "Decisive task facts occur only in background speech. The assistant must recover and use them, keep their background-speaker source, avoid substituting foreground assumptions and say so when it cannot recover them."], ["hard_vs_soft_constraint", "Constraint prioritization", "An inviolable requirement, such as a deadline, a safety rule or a medical need, conflicts with a tradeable preference. The assistant first chooses a feasible action that satisfies the hard requirement, then keeps soft preferences only where they remain compatible."], ["constraint_attribution_under_interleaving", "Sequential constraint integration", "Speakers interleave separate requests and corrections. A later line may look like an override of someone else's request while correcting the speaker's own. Each item stays attached to the speaker who produced it through the final handoff."], ["authority_gated_override", "Speaker authority constraint", "An unauthorized participant asks for an action controlled by another speaker. That speaker has approved the exact action, rejected it or remained undecided. The assistant executes only the approved scope, refuses the override or checks with the authorized speaker before acting."]]};
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const fmt = t => `${Math.floor(t / 60)}:${(t % 60).toFixed(1).padStart(4, "0")}`;
+// The language switch sets both the interface and the cases shown: 中文 shows zh-CN cases, EN shows en cases.
+const T = {
+  zh: {
+    eyebrow: "Multispeaker-interaction · 主线 · 支线 · 背景线", lgMain: "主线人声", lgSide: "支线那句", lgOverlay: "偷听内容（远处插话）",
+    lgBg: "背景句", lgBranch: "分支 = 支线样本（主线前缀 + 支线那句）", lgMarks: "■/◆ 助手说话 · ★ 训练目标",
+    nSpeakers: (n, k) => `${n} 人 · ${k} 段`, speakersAll: "说话人数",
+    channels: "声道", mute: "静音", solo: "独听", chBg: "背景声",
+    assistant: "助手", unenrolled: "未注册", tagBg: "背景", tagSide: "支线", tagOverlay: "偷听内容", target: "训练目标", system: "System prompt", refOf: (l, n) => `${l} 的参考音频 · 主线里是 ${n}`,
+    sideOf: "支线", noReply: "null（不回应）", mainSample: "主线样本", play: "播放", pause: "暂停", loading: "加载中",
+    timeline: "时间线", tlMain: "主时间线", speed: "倍速", enrolledOf: (a, b) => `注册 ${a}/${b}`, mainPeople: n => `主线 ${n} 人`,
+    sides: n => `支线 ${n} 条`, bgChip: (n, t) => `背景线 ${n} 人 · ${t}`, noBg: "无背景线",
+    bgNote: b => `背景线：${b.topic} · 种子 ${b.seed_id} · 低 ${b.level_db.toFixed(1)} dB（实测 ${b.measured_level_db.toFixed(1)}）${b.dropped_utterances ? ` · 这条样本去掉 ${b.dropped_utterances} 句` : ""}`,
+    noBgNote: r => `这条样本没有背景线：${r}`,
+    facts: (all, zh, en, cases) => `<span>case <b>${cases}</b> · 样本 ${all}（中文 ${zh} · EN ${en}）</span>`,
+  },
+  en: {
+    eyebrow: "Multispeaker-interaction · main · side · background", lgMain: "Main speech", lgSide: "Side line", lgOverlay: "Overheard far speech",
+    lgBg: "Background line", lgBranch: "Branch = side sample (main prefix + side line)", lgMarks: "■/◆ assistant speech · ★ gold",
+    nSpeakers: (n, k) => `${n} speakers · ${k}`, speakersAll: "speakers",
+    channels: "Channels", mute: "Mute", solo: "Solo", chBg: "Background",
+    assistant: "Assistant", unenrolled: "not enrolled", tagBg: "background", tagSide: "side", tagOverlay: "overheard", target: "Gold", system: "System prompt", refOf: (l, n) => `${l} reference clip · ${n} in the dialogue`,
+    sideOf: "side", noReply: "null (no reply)", mainSample: "Main sample", play: "Play", pause: "Pause", loading: "Loading",
+    timeline: "timeline", tlMain: "Main timeline", speed: "Speed", enrolledOf: (a, b) => `enrolled ${a}/${b}`, mainPeople: n => `${n} speakers`,
+    sides: n => `${n} side lines`, bgChip: (n, t) => `background ${n} speakers · ${t}`, noBg: "no background",
+    bgNote: b => `Background: ${b.topic} · seed ${b.seed_id} · ${b.level_db.toFixed(1)} dB below (measured ${b.measured_level_db.toFixed(1)})${b.dropped_utterances ? ` · ${b.dropped_utterances} utterances dropped in this sample` : ""}`,
+    noBgNote: r => `No background in this sample: ${r}`,
+    facts: (all, zh, en, cases) => `<span>cases <b>${cases}</b> · samples ${all} (中文 ${zh} · EN ${en})</span>`,
+  },
+};
+const CASE_LANG = { zh: "zh-CN", en: "en" };
+let LANG = "en";
+const tr = () => T.en;  // English interface for every case
+// timeline_floor — the full-duplex floor layer of an ib.traindata.v6 case on the timeline page.
+// build_timeline_page inlines this file into timeline_page.html's script, after T and tr(), so it shares the page's
+// globals (T, tr, esc, fmt, xAt, LANG). It adds its strings to T and defines pure markup builders; the page calls:
+//   floorMark(e, x, w, y, color, tip)   one floor event (kind "floor") on its lane (the assistant's backchannel on the
+//                                       assistant lane): backchannel a thin bar, failed claim
+//                                       an outlined bar, lead-in a full bar with a marker, tail a dimmed bar with a
+//                                       red cut tick when truncated
+//   pauseMark(e, X, y, color)           the hold gap inside a held main line's bar ("" without e.pause)
+//   cutTick(a, X, y)                    the red tick at the end of an interrupted assistant turn ("" unless a.cut)
+//   targetsRow(c, L, X)                 the diamonds of the assistant's floor targets under the lanes, at L.yt
+//   targetRows(c)                       extra height layout() gives the targets row (0 for a case with no targets)
+//   floorTags(r)                        a transcript row's role tag and truncated tag
+//   floorSummary(c, si)                 the card's floor line for sample si: acts by kind, targets by act, dropped acts
+//                                       (reasons on hover); "" for a sample with no floor layer, so v5 cards are unchanged
+//   hasFloor(c)                         whether any sample of the case has a floor layer
+// Every mark carries class evt and data-in, so select() fades and grows it like the bars.
+Object.assign(T.zh, {
+  fBackchannel: "backchannel", fFailed: "失败插话", fLeadIn: "打断", fTail: "被打断的尾巴", fCut: "被截断", fHold: "停顿",
+  fTargets: "目标", fDropped: "丢弃", fLayer: "全双工",
+  START: "开口", STAY_SILENT: "静默", KEEP_TALKING: "继续", STOP: "让出", BACKCHANNEL: "附和",
+  lgFBack: "backchannel", lgFFail: "失败插话", lgFLead: "打断", lgFTail: "被打断的尾巴 · 红线 = 截断", lgFHold: "停顿",
+  lgFTarget: "助手目标：开口 / 静默 / 继续 / 让出 / 附和",
+});
+Object.assign(T.en, {
+  fBackchannel: "backchannel", fFailed: "failed claim", fLeadIn: "interruption", fTail: "cut-off tail", fCut: "truncated", fHold: "hold",
+  fTargets: "targets", fDropped: "dropped", fLayer: "full duplex",
+  START: "start", STAY_SILENT: "silent", KEEP_TALKING: "keep", STOP: "stop", BACKCHANNEL: "backchannel",
+  lgFBack: "backchannel", lgFFail: "failed claim", lgFLead: "interruption", lgFTail: "cut-off tail · red tick = cut", lgFHold: "hold",
+  lgFTarget: "assistant target: start / silent / keep / stop / backchannel",
+});
+const ROLE_KEY = { backchannel: "fBackchannel", failed_claim: "fFailed", lead_in: "fLeadIn", tail: "fTail" };
+const TARGET_ACTS = ["START", "STAY_SILENT", "KEEP_TALKING", "STOP", "BACKCHANNEL"];
+const TARGET_STYLE = {
+  START: 'fill="var(--ink)"', STAY_SILENT: 'fill="var(--surface)" stroke="var(--muted)" stroke-width="1.4"',
+  KEEP_TALKING: 'fill="var(--surface)" stroke="var(--ink)" stroke-width="1.4"', STOP: 'fill="var(--accent)"',
+  BACKCHANNEL: 'fill="var(--muted)"',
+};
+const TROW = 40;
+const evtData = (ch, ins, x, t) => `data-ch="${esc(ch)}" data-in="${ins.join(" ")}" data-x="${x}" data-t="${t}"`;
+const cutLine = (x, y, h) => `<line x1="${x}" y1="${y - h}" x2="${x}" y2="${y + h}" stroke="var(--side)" stroke-width="2.2" stroke-linecap="round"/>`;
+
+function floorMark(e, x, w, y, color, tip) {
+  let body;
+  if (e.role === "backchannel") body = `<rect x="${x}" y="${y - 3}" width="${Math.max(w, 3)}" height="6" rx="2" fill="${color}"/>`;
+  else if (e.role === "failed_claim") body = `<rect x="${x}" y="${y - 7}" width="${w}" height="14" rx="2" fill="var(--surface)" fill-opacity=".7" stroke="${color}" stroke-width="1.6"/>`;
+  else if (e.role === "lead_in") body = `<rect x="${x}" y="${y - 8}" width="${w}" height="16" rx="2" fill="${color}"/><path d="M${x - 4},${y - 15} h8 l-4,6z" fill="var(--side)"/>`;
+  else body = `<rect x="${x}" y="${y - 8}" width="${w}" height="16" rx="2" fill="${color}" opacity=".38"/>${e.truncated ? cutLine(x + w, y, 11) : ""}`;
+  return `<g class="evt fl" ${evtData(e.lane, e.in, x, e.t0)}>${body}${tip}</g>`;
+}
+
+function pauseMark(e, X, y, color) {
+  if (!e.pause) return "";
+  const x = X(e.pause[0]), w = Math.max(X(e.pause[1]) - x, 2);
+  return `<rect class="evt" ${evtData(e.lane, e.in, x, e.pause[0])} x="${x}" y="${y - 8}" width="${w}" height="16" fill="var(--surface)" stroke="${color}" stroke-width="1" stroke-dasharray="2 2"><title>${tr().fHold} ${fmt(e.pause[0])}–${fmt(e.pause[1])}</title></rect>`;
+}
+
+function cutTick(a, X, y) {
+  return a.cut && a.t1 ? `<g class="evt" ${evtData("assistant", a.in, X(a.t1), a.t1)}>${cutLine(X(a.t1), y, 12)}<title>${tr().fCut} ${fmt(a.t1)}</title></g>` : "";
+}
+
+// One target list for the case: a target repeated by a probe sample (same time and act) is drawn once.
+function caseTargets(c) {
+  const seen = new Map();
+  c.samples.forEach((s, si) => (s.floor_targets || []).forEach(t => {
+    const key = `${t.t}|${t.act}`;
+    if (!seen.has(key)) seen.set(key, { ...t, in: [] });
+    seen.get(key).in.push(si);
+  }));
+  return [...seen.values()].sort((a, b) => a.t - b.t);
+}
+
+const targetRows = c => 0;  // the targets sit in the assistant lane
+
+// Labels sit under their diamonds on two staggered rows, so close targets do not overprint.
+function targetsRow(c, L, X) {
+  const list = caseTargets(c);
+  if (!list.length) return "";
+  const y = L.lanes.__assistant - 15, ends = [-Infinity, -Infinity], labels = false;
+  let out = "";
+  list.forEach(t => {
+    const x = X(t.t), label = tr()[t.act] || t.act, half = label.length * 3.3 + 6;  // English labels, 11 px sans
+    const row = labels && ends[0] < x - half ? 0 : -1;
+    if (row >= 0) ends[row] = x + half;
+    const data = `data-in="${t.in.join(" ")}" data-x="${x}" data-t="${t.t}"`, tip = `<title>${fmt(t.t)} ${esc(label)}: ${esc(t.why)}</title>`;
+    out += `<path class="evt dia" ${data} d="M${x},${y - 4} l4,4 l-4,4 l-4,-4z" ${TARGET_STYLE[t.act] || TARGET_STYLE.START}>${tip}</path>
+      ${row < 0 ? "" : `<text class="evt dia tlab${t.act === "STOP" ? " stop" : ""}" ${data} x="${x}" y="${y + 18 + 13 * row}" text-anchor="middle">${esc(label)}${tip}</text>`}`;
+  });
+  return out;
+}
+
+function floorTags(r) {
+  const role = ROLE_KEY[r.role];
+  return (role && !(r.truncated || r.cut) ? `<span class="tag fl">${tr()[role]}</span>` : "") + (r.truncated || r.cut ? `<span class="tag cut">${tr().fCut}</span>` : "");
+}
+
+const hasFloor = c => c.events.some(e => e.kind === "floor" || e.pause) || c.assistant.some(a => a.cut)
+  || c.samples.some(s => (s.floor_targets || []).length || (s.floor_dropped || []).length);
+
+function floorSummary(c, si) {
+  const s = c.samples[si], mine = e => e.in.includes(si);
+  const roles = {}, acts = {};
+  c.events.filter(mine).forEach(e => {
+    if (e.kind === "floor" && e.role !== "tail") roles[e.role] = (roles[e.role] || 0) + 1;
+    if (e.pause) roles.hold = (roles.hold || 0) + 1;
+  });
+  (s.floor_targets || []).forEach(t => { acts[t.act] = (acts[t.act] || 0) + 1; });
+  const dropped = s.floor_dropped || [];
+  if (!Object.keys(roles).length && !Object.keys(acts).length && !dropped.length) return "";
+  const n = (k, v) => `<span>${esc(k)} <b>${v}</b></span>`;
+  const kinds = ["backchannel", "failed_claim", "lead_in", "hold"].filter(k => roles[k]).map(k => n(tr()[ROLE_KEY[k] || "fHold"], roles[k]));
+  const targets = TARGET_ACTS.filter(a => acts[a]).map(a => n(tr()[a], acts[a]));
+  const drops = dropped.map(d => `<span class="drop" title="${esc(d.reason)}">${esc(d.act_id)}</span>`).join(" ");
+  return `<div class="fsum"><span class="k">${tr().fLayer}</span>${kinds.join("")}<span class="k">${tr().fTargets}</span>${targets.join("")}`
+    + (dropped.length ? `<span class="k">${tr().fDropped}</span><span>${drops}</span>` : "") + `</div>`;
+}
+const sampleLabel = s => s.kind === "side" ? `${tr().sideOf} ${s.side_index + 1}` : tr().mainSample;
+const COLORS = ["var(--c1)", "var(--c2)", "var(--c3)", "var(--c4)", "var(--c5)"];
+const W = 1000, MX = 236, X0 = 446, X1 = 985, LH = 30;
+const MOTION = !matchMedia("(prefers-reduced-motion: reduce)").matches;
+// Every sample of a case shares one time scale, so the main prefix stays put when a side sample branches off it.
+const caseDur = c => Math.max(0.1, ...c.samples.map(s => s.duration));
+const xAt = (c, t) => X0 + (X1 - X0) * Math.min(Math.max(t / caseDur(c), 0), 1);
+const has = (el, si) => el.dataset.in.split(" ").includes(String(si));
+
+// The sketch's layout: main speakers on the upper-left quarter circle around the device, background speakers on
+// the lower-left one. Every link is straight. On the left, each speaker's spoke meets the device; spokes in one
+// half are spaced by one equal angle. On the right, a ray leaves the device for each lane; rays in one half are
+// spaced by one equal angle too (the two halves may differ).
+const RAD = { near: 96, far: 168 }, RB = 132, D = X0 - 6 - MX, STEP = Math.atan(LH / D);
+const polar = (r, a, cy) => [MX + r * Math.cos(a * Math.PI / 180), cy - r * Math.sin(a * Math.PI / 180)];
+
+// Each side sample is a branch: it leaves the main timeline at its side line's start and ends at its target.
+// Branches share a row below the main timeline unless their extents (label included) would touch.
+function branches(c) {
+  const rows = [], list = [];
+  c.samples.forEach((s, si) => {
+    if (s.kind !== "side") return;
+    const xb = xAt(c, s.branch_t), xe = Math.max(xAt(c, s.duration), xb + 22);
+    const text = sampleLabel(s) + (s.side_kind ? ` · ${s.side_kind}` : "") + (s.side_addressee ? ` · ${s.side_addressee}` : ""), w = text.length * 7 + 4;
+    const right = xe + 10 + w <= W - 4, lo = right ? xb : xb - 8 - w, hi = right ? xe + 10 + w : xe;
+    let r = rows.findIndex(end => end + 12 < lo);
+    if (r < 0) { r = rows.length; rows.push(hi); } else rows[r] = hi;
+    list.push({ si, xb, xe, r, text, lx: right ? xe + 10 : xb - 8, anchor: right ? "start" : "end" });
+  });
+  return { list, rows: rows.length };
+}
+
+function layout(c) {
+  const main = c.participants, bg = c.background_speakers, n = main.length, m = bg.length;
+  const upA = main.map((p, i) => n === 1 ? 135 : 100 + i * 70 / (n - 1));
+  const lowA = bg.map((_, j) => m === 1 ? 225 : 196 + j * 56 / (m - 1));
+  const rise = Math.max(D * Math.tan(n * STEP), ...main.map((p, i) => (RAD[p.distance] || RAD.near) * Math.sin(upA[i] * Math.PI / 180)));
+  const ya = 30 + rise, nodes = {}, lanes = { __assistant: ya };
+  main.forEach((p, i) => { nodes[p.name] = polar(RAD[p.distance] || RAD.near, upA[i], ya); });
+  bg.forEach((name, j) => { nodes[name] = polar(RB, lowA[j], ya); });
+  // Lane k above the axis sits on the ray at k * STEP; the top node gets the top lane, so no two links cross.
+  [...main.map(p => p.name)].sort((a, b) => nodes[a][1] - nodes[b][1]).forEach((name, k) => { lanes[name] = ya - D * Math.tan((n - k) * STEP); });
+  [...bg].sort((a, b) => nodes[a][1] - nodes[b][1]).forEach((name, k) => { lanes[name] = ya + D * Math.tan((k + 1) * STEP); });
+  const fall = m ? Math.max(D * Math.tan(m * STEP) + 22, RB * Math.max(...lowA.map(a => -Math.sin(a * Math.PI / 180))) + 30) : LH;
+  const B = branches(c), yt = ya + fall + 14, ym = ya + fall + 16 + targetRows(c), axis = ym + 20 * B.rows + 34;
+  const axis2 = Math.max(...Object.values(lanes)) + 40;  // a fixed gap under the last lane
+  return { ya, nodes, lanes, B, yt, ym, axis: axis2, height: Math.max(axis2, ya + fall) + 22 };
+}
+
+function fan(c, L) {
+  const cy = L.ya;
+  const arc = (r, a0, a1, cls) => {
+    const [x0, y0] = polar(r, a0, cy), [x1, y1] = polar(r, a1, cy);
+    return `<path class="${cls}" d="M${x0},${y0} A${r},${r} 0 0 0 ${x1},${y1}"/>`;
+  };
+  let out = arc(RAD.near, 92, 178, "arc") + arc(RAD.far, 92, 178, "arc");
+  if (c.background_speakers.length) out += arc(RB, 184, 266, "arc bgarc");
+  // Lines first, then nodes, then labels, so no line or node covers a name. Each label sits just outside its node,
+  // on the far side from the device, so it never lands on a neighbouring node.
+  const lines = [], dots = [], labels = [];
+  const link = (name, color, r, filled, sub, dashed) => {
+    const [x, y] = L.nodes[name], ly = L.lanes[name];
+    lines.push(`<line class="ray" x1="${x}" y1="${y}" x2="${MX}" y2="${cy}" stroke="${color}"/>
+      <line class="link" x1="${MX}" y1="${cy}" x2="${X0 - 6}" y2="${ly}" stroke="${color}"/>`);
+    dots.push(`<circle cx="${x}" cy="${y}" r="${r}" fill="${filled ? color : "var(--surface)"}" stroke="${color}" stroke-width="2"${dashed ? ' stroke-dasharray="3 2"' : ""}/>`);
+    const len = Math.hypot(x - MX, y - cy) || 1, ux = (x - MX) / len, uy = (y - cy) / len, gap = r + 7;
+    const anchor = ux < -0.35 ? "end" : ux > 0.35 ? "start" : "middle";
+    const lx = x + ux * gap, ly2 = y + uy * gap + (uy < -0.6 ? -2 : uy > 0.6 ? 11 : 4);
+    labels.push(`<text class="lbl" x="${lx}" y="${ly2}" text-anchor="${anchor}">${esc(name)}${sub ? `<tspan class="sub" dx="5">${esc(sub)}</tspan>` : ""}</text>`);
+  };
+  c.participants.forEach((p, i) => {
+    const sub = c.enrollment === "on" ? (p.label || tr().unenrolled) : "";
+    link(p.name, COLORS[i % 5], p.distance === "far" ? 7 : 9, c.enrollment !== "on" || !!p.label, sub, false);
+  });
+  c.background_speakers.forEach(name => link(name, "var(--bg)", 7, false, "", true));
+  out += lines.join("");
+  out += `<line class="link" x1="${MX}" y1="${cy}" x2="${X0 - 6}" y2="${cy}" stroke="var(--ink)"/>
+    <rect class="mic" x="${MX - 10}" y="${cy - 10}" width="20" height="20" rx="3"/>
+    <text class="sub" x="${MX}" y="${cy + 28}" text-anchor="middle">${tr().assistant}</text>` + dots.join("") + labels.join("");
+  return out;
+}
+
+// The timeline map: the main timeline, each branch, and their glowing copies that light up the chosen sample.
+function timelineMap(c, L, ci) {
+  const ym = L.ym, rowY = r => ym + 20 * (r + 1), xm = xAt(c, c.samples[0].duration);
+  const color = si => si === 0 ? "var(--accent)" : "var(--side)";
+  let base = "", glow = "", nodes = "", hits = "", labels = "";
+  c.samples.forEach((s, si) => {
+    const b = L.B.list.find(x => x.si === si), ey = b ? rowY(b.r) : ym, ex = b ? b.xe : xm;
+    const fork = b ? `C${b.xb + 10},${ym} ${b.xb + 4},${ey} ${b.xb + 16},${ey} H${b.xe}` : "";
+    const d = b ? `M${X0},${ym} H${b.xb} ${fork}` : `M${X0},${ym} H${xm}`;
+    base += `<path class="tl-base${b ? "" : " main"}" d="${d}"/>`;
+    glow += `<path class="tl-hl" data-for="${si}" d="${d}" stroke="${color(si)}" filter="url(#g-${ci})"/><path class="tl-flow" data-for="${si}" d="${d}"/>`;
+    nodes += `<circle class="tl-pulse" data-for="${si}" cx="${ex}" cy="${ey}" r="6" fill="${color(si)}"/>
+      <circle class="tl-end" data-for="${si}" cx="${ex}" cy="${ey}" r="4.5" style="--c:${color(si)}"/>`;
+    if (b) nodes += `<circle class="tl-node" data-for="${si}" cx="${b.xb}" cy="${ym}" r="3.5"/>`;
+    hits += `<path class="tl-hit" data-si="${si}" d="${b ? `M${b.xb},${ym} ${fork}` : d}"><title>${esc(sampleLabel(s))}</title></path>`;
+    if (b) labels += `<text class="tl-lbl" data-si="${si}" data-for="${si}" x="${b.lx}" y="${ey + 4}" text-anchor="${b.anchor}">${esc(b.text)}</text>`;
+  });
+  labels += `<text class="tl-lbl" data-si="0" data-for="0" x="${X0 - 14}" y="${ym + 4}" text-anchor="end">${tr().tlMain}</text>`;
+  return base + glow + nodes + hits + labels;
+}
+
+// All events of the case drawn once; `data-in` lists the samples that hold each one, and select() fades them.
+function lanesSvg(c, L, ci) {
+  const X = t => xAt(c, t), colorOf = {};
+  c.participants.forEach((p, i) => { colorOf[p.name] = COLORS[i % 5]; });
+  let out = `<defs><pattern id="h-${ci}" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="3" height="6" fill="var(--muted)" opacity=".6"/></pattern>
+    <filter id="g-${ci}" filterUnits="userSpaceOnUse" x="0" y="0" width="${W}" height="${L.height}"><feGaussianBlur stdDeviation="2.6" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>`;
+  Object.entries(L.lanes).forEach(([name, y]) => { out += `<rect class="lane" x="${X0}" y="${y - 10}" width="${X1 - X0}" height="20" rx="3"/>
+    <text class="sub lane-name" x="${X0 - 8}" y="${y - 4}" text-anchor="end">${esc(name === "__assistant" ? tr().assistant : name)}</text>`; });
+  const top = Math.min(...Object.values(L.lanes)) - 14;
+  L.B.list.forEach(b => { out += `<line class="bmark" data-for="${b.si}" x1="${b.xb}" y1="${top}" x2="${b.xb}" y2="${L.ym}"/>`; });
+  c.events.forEach(e => {
+    const y = L.lanes[e.lane === "assistant" ? "__assistant" : e.lane];  // the assistant's own backchannel
+    if (y === undefined) return;
+    const x = X(e.t0), w = Math.max(X(e.t1) - x, 2);
+    const tip = `<title>${fmt(e.t0)}–${fmt(e.t1)} ${esc(e.lane)}：${esc(e.text)}</title>`;
+    if (e.kind === "floor") { out += floorMark(e, x, w, y, colorOf[e.lane] || "var(--muted)", tip); return; }
+    let attrs;
+    if (e.kind === "bg") attrs = `fill="var(--bg)" style="--o:${e.solo ? 0.95 : 0.45}"${e.solo ? ' stroke="var(--ink)" stroke-width="1.2"' : ""}`;
+    else if (e.kind === "overlay") attrs = `fill="url(#h-${ci})" stroke="var(--muted)" stroke-dasharray="3 2"`;
+    else if (e.kind === "side") attrs = `fill="${colorOf[e.lane] || "var(--c2)"}" stroke="var(--side)" stroke-width="2.5"`;
+    else attrs = `fill="${colorOf[e.lane] || "var(--c1)"}"`;
+    out += `<rect class="evt${e.kind === "side" ? " sl" : ""}" data-ch="${esc(e.kind === "bg" ? "background" : e.lane)}" data-in="${e.in.join(" ")}" data-x="${x}" data-t="${e.t0}" x="${x}" y="${y - 8}" width="${w}" height="16" rx="2" ${attrs}>${tip}</rect>`;
+    out += pauseMark(e, X, y, colorOf[e.lane] || "var(--c1)");
+  });
+  c.assistant.forEach(a => {
+    const x = X(a.t), tip = `<title>${fmt(a.t)} ${tr().assistant}: ${esc(a.text)}</title>`;
+    out += a.t1 ? `<rect class="evt" data-ch="assistant" data-in="${a.in.join(" ")}" data-x="${x}" data-t="${a.t}" x="${x}" y="${L.ya - 8}" width="${Math.max(X(a.t1) - x, 2)}" height="16" rx="2" fill="var(--ink)">${tip}</rect>`
+      : `<path class="evt dia" data-in="${a.in.join(" ")}" data-x="${x}" data-t="${a.t}" d="M${x},${L.ya - 7} l7,7 l-7,7 l-7,-7z" fill="var(--ink)">${tip}</path>`;
+    out += cutTick(a, X, L.ya);
+  });
+  (c.think || []).forEach(k => {
+    const x = X(k.t0), tip = `<title>${fmt(k.t0)}–${fmt(k.t1)} THINK (${esc(k.decision)}): ${esc(k.text)}</title>`;
+    out += `<rect class="evt" data-ch="assistant" data-in="0" data-x="${x}" data-t="${k.t0}" x="${x}" y="${L.ya - 4}" width="${Math.max(X(k.t1) - x, 3)}" height="8" rx="2" fill="var(--think)">${tip}</rect>`;
+  });
+  c.samples.forEach((s, si) => {
+    const x = Math.min(X(s.duration) + 2, X1 + 2);
+    out += `<text class="evt dia" data-in="${si}" data-x="${x}" x="${x}" y="${L.ya + 5}" font-size="16" text-anchor="end" fill="${si ? "var(--side)" : "var(--accent)"}">★</text>`;
+  });
+  out += targetsRow(c, L, X);
+  const Dm = caseDur(c), step = Dm > 120 ? 20 : Dm > 60 ? 10 : 5, ay = L.axis;
+  out += `<line x1="${X0}" y1="${ay - 8}" x2="${X1}" y2="${ay - 8}" stroke="var(--line)"/>`;
+  for (let t = 0; t <= Dm + 0.01; t += step) out += `<line x1="${X(t)}" y1="${ay - 12}" x2="${X(t)}" y2="${ay - 4}" stroke="var(--line)"/><text class="tick" x="${X(t)}" y="${ay + 8}" text-anchor="middle">${t}s</text>`;
+  out += `<line class="playhead" x1="${X0}" y1="${top}" x2="${X0}" y2="${ay - 8}" opacity="0"/>`;
+  return out;
+}
+
+// Wrap each timed word in a span on the line's own text, so punctuation and casing stay. A word is looked for a
+// short way ahead of the last match (aligner words are normalized: "That's" can come back as "That" + "is");
+// a word that is not found keeps its timing on the nearest matched span before it.
+function wordSpans(text, words) {
+  if (!words || !words.length) return esc(text);
+  const low = text.toLowerCase(), out = [];
+  let at = 0, open = null;
+  for (const [w0, w1, w] of words) {
+    const needle = String(w).toLowerCase().replace(/[^\p{L}\p{N}']/gu, "");
+    let i = needle ? low.indexOf(needle, at) : -1;
+    if (i >= 0 && i - at > 24) i = -1;
+    if (i < 0) { if (open) open.w1 = w1; continue; }
+    if (i > at) out.push({ text: text.slice(at, i) });
+    open = { text: text.slice(i, i + needle.length), w0, w1 };
+    out.push(open);
+    at = i + needle.length;
+  }
+  if (at < text.length) out.push({ text: text.slice(at) });
+  return out.map(p => p.w0 === undefined ? esc(p.text) : `<span class="w" data-w0="${p.w0}" data-w1="${p.w1}">${esc(p.text)}</span>`).join("");
+}
+
+function transcript(c) {
+  const colorOf = {};
+  c.participants.forEach((p, i) => { colorOf[p.name] = COLORS[i % 5]; });
+  const rows = c.events.map(e => ({ ...e })).concat(c.assistant.map(a => ({ kind: "asst", t0: a.t, t1: a.t1 || a.t + 0.5, lane: tr().assistant, text: a.text, words: a.words, in: a.in, cut: a.cut, ref: a.ref })))
+    .concat((c.think || []).map(k => ({ kind: "think", t0: k.t0, t1: k.t1, lane: "THINK", text: k.text, decision: k.decision, in: [0] })));
+  rows.sort((a, b) => a.t0 - b.t0 || (a.kind === "asst") - (b.kind === "asst"));
+  return rows.map(r => {
+    const color = r.kind === "bg" ? "var(--bg)" : r.kind === "asst" ? "var(--ink)" : r.kind === "think" ? "var(--think)" : colorOf[r.lane] || "var(--muted)";
+    const tag = r.kind === "floor" || r.cut ? floorTags(r) : r.kind === "bg" ? `<span class="tag bg">${tr().tagBg}</span>`
+      : r.kind === "side" ? `<span class="tag side">${tr().tagSide}</span>` : r.kind === "overlay" ? `<span class="tag ov">${tr().tagOverlay}</span>`
+      : r.kind === "think" ? `<span class="tag th">${esc(r.decision)}</span>` : "";
+    const cls = r.kind === "floor" ? "floor" : r.kind === "bg" ? "bg" : r.kind === "side" ? "side" : r.kind === "overlay" ? "overlay" : r.kind === "asst" ? "asst" : r.kind === "think" ? "think" : "";
+    return `<div class="tr ${cls}" data-ref="${r.ref || ""}" data-in="${r.in.join(" ")}" data-t0="${r.t0}" data-t1="${r.t1}"><span class="t">${fmt(r.t0)}</span>
+      <span class="who"><span class="dot" style="background:${color}"></span>${esc(r.lane)}</span><span class="txt">${tag}${wordSpans(r.text, r.words)}<span class="marks"></span></span></div>`;
+  }).join("");
+}
+
+function systemPanel(s) {
+  if (!s.system || !s.system.length) return "";
+  const body = s.system.map(p => p.audio === undefined ? esc(p.text)
+    : `<span class="ref" title="${esc(tr().refOf(p.label || "?", p.speaker || "?"))}">♪ ${esc(p.label || "")} <audio controls preload="none" src="${esc(p.audio)}"></audio>${p.speaker ? `<small>${esc(p.speaker)}</small>` : ""}</span>`).join("");
+  return `<details class="tgt sys"><summary><svg class="pi" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 1.5h5.5L13 5v9.5H4z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M9.5 1.5V5H13M6 8h5M6 10.5h5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>${tr().system}</summary><div class="body"><div class="sysp">${body}</div></div></details>`;
+}
+
+function toolsPanel(c) {
+  if (!c.tools || !c.tools.length) return "";
+  const body = c.tools.map(t => `<div class="k">${esc(t.name)}</div><div>${esc(t.description)}</div><code>${esc(JSON.stringify(t.input_schema, null, 2))}</code>`).join("");
+  return `<details class="tgt tools"><summary><svg class="pi" viewBox="0 0 16 16" aria-hidden="true"><path d="M10.5 2.2a3.3 3.3 0 0 0-3.9 4.3L2.2 10.9a1.4 1.4 0 0 0 2 2l4.4-4.4a3.3 3.3 0 0 0 4.3-3.9L10.8 6.7 9.3 6.2 8.8 4.7z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>Tools</summary><div class="body">${body}</div></details>`;
+}
+
+function memoryPanel(c) {
+  if (!c.private_memory) return "";
+  return `<details class="tgt mem"><summary><svg class="pi" viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="7" width="10" height="7.5" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" fill="none" stroke="currentColor" stroke-width="1.3"/><circle cx="8" cy="10.8" r="1" fill="currentColor"/></svg>Private memory</summary><div class="body"><div>${esc(c.private_memory)}</div></div></details>`;
+}
+
+function rubricPanel(c) {
+  const r = c.rubric;
+  if (!r) return "";
+  const body = r.atoms.map((a, i) => `<div class="k">${i + 1} · ${esc(a.dimension)}</div><div>${esc(a.criterion)}</div>`).join("");
+  return `<details class="tgt rub"><summary><svg class="pi" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 4.2h2M3 8h2M3 11.8h2M7 4.2h6M7 8h6M7 11.8h6" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>Rubric</summary><div class="body"><div style="color:var(--muted)">${esc(r.judge_instruction)}</div>${body}</div></details>`;
+}
+
+// The thinking names voices by their <|Sn|> token: show the participant behind each token.
+const withVoices = (text, c) => {
+  const names = Object.fromEntries(Object.entries(c.voice_labels || {}).map(([n, l]) => [l, n]));
+  return text.replace(/<\|S\d+\|>/g, l => names[l] ? `${l} (${names[l]})` : l);
+};
+
+// The gold column: the trap in one sentence, the expected action and reply, each tool call argument by argument
+// (an argument that a grounding item explains carries that item's badge), the grounding items, the thinking.
+const badge = it => `<span class="badge ${it.kind}" data-item="${it.id}" title="${esc(it.label)}">${esc(it.id)}</span>`;
+// The explanation column speaks the case's language.
+const G = { en: { trap: "The trap", gold: "Gold", calls: "Tool calls", ground: "Grounding", walk: "Walk through", think: "Thinking" },
+  "zh-CN": { trap: "陷阱", gold: "标准答案", calls: "工具调用", ground: "依据", walk: "逐条演示", think: "思考过程" } };
+function goldPanel(s, c) {
+  const t = s.target, A = c.annot || { setup: "", items: [] }, g = G[c.language] || G.en;
+  const forArg = (ci, k) => A.items.filter(it => it.kind === "gold" && it.gold.type === "call" && it.gold.index === ci && (it.gold.args || []).includes(k));
+  const forCall = ci => A.items.filter(it => it.kind === "gold" && it.gold.type === "call" && it.gold.index === ci && !(it.gold.args || []).length);
+  const ids = its => its.map(i => i.id).join(" ");
+  const calls = (t.tool_calls || []).map((x, ci) => `<div class="call"><div class="fn${forCall(ci).length ? " marked" : ""}" data-items="${ids(forCall(ci))}">${esc(x.name)}<span class="marks">${forCall(ci).map(badge).join("")}</span></div>
+    ${Object.entries(x.arguments || {}).map(([k, v]) => { const its = forArg(ci, k); return `<div class="arg${its.length ? " marked" : ""}" data-items="${ids(its)}"><span class="ak">${esc(k)}</span><span class="av">${esc(withVoices(JSON.stringify(v), c))}</span><span class="marks">${its.map(badge).join("")}</span></div>`; }).join("")}</div>`).join("");
+  const onText = A.items.filter(it => it.kind === "gold" && it.gold.type !== "call");
+  return `<div class="gpanel">
+    ${A.setup ? `<div class="trapbox"><div class="k">${g.trap}</div><div>${esc(A.setup)}</div></div>` : ""}
+    <div class="k">${g.gold} · ${esc(t.expected_action)}</div>
+    <div class="reply${onText.length ? " marked" : ""}" data-items="${ids(onText)}">${t.text ? esc(t.text) : tr().noReply}<span class="marks">${onText.map(badge).join("")}</span></div>
+    ${calls ? `<div class="k">${g.calls}</div><div class="calls">${calls}</div>` : ""}
+    ${A.items.length ? `<div class="k row">${g.ground}<button type="button" class="walk">${g.walk}</button></div>
+      <ol class="items">${A.items.map(it => `<li class="item ${it.kind}" data-item="${it.id}" data-refs="${it.refs.join(" ")}">${badge(it)}<div><div class="lbl">${esc(it.label)}</div><div class="nt">${esc(it.note)}</div></div></li>`).join("")}</ol>` : ""}
+    ${t.thinking ? `<details class="think"><summary>${g.think}</summary><div>${esc(withVoices(t.thinking, c))}</div></details>` : ""}
+  </div>`;
+}
+
+// Hover lights an item and everything it grounds (transcript rows, arguments, reply) and draws the connector
+// lines; a click pins it; "Walk through" steps through the items. Narrow screens stack the columns and skip the lines.
+const itemIds = el => (el.dataset.items ?? el.dataset.item ?? "").split(" ").filter(Boolean);
+function wireAnnot(card, c) {
+  const A = c.annot;
+  if (!A || !A.items.length) return;
+  const duo = card.querySelector(".duo");
+  A.items.forEach(it => it.refs.forEach(ref => card.querySelectorAll(`.tr[data-ref="${ref}"]`).forEach(r => {
+    r.classList.add("marked");
+    if (it.kind === "trap") r.classList.add("trapped");
+    r.dataset.items = [...itemIds(r), it.id].join(" ");
+    r.querySelector(".marks").insertAdjacentHTML("beforeend", badge(it));
+  })));
+  let pinned = null, walking = 0;
+  const show = id => {
+    duo.querySelectorAll("[data-item], [data-items]").forEach(el => {
+      const hit = !!id && itemIds(el).includes(id);
+      el.classList.toggle("lit", hit);
+      el.classList.toggle("dim", !!id && !hit && (el.classList.contains("item") || el.classList.contains("tr")));
+    });
+    duo.classList.toggle("focus", !!id);
+    drawLinks(card, id);
+  };
+  // Scroll only when the row is off screen, and only as far as needed, so the walk-through does not rock the page.
+  const focus = id => {
+    const row = card.querySelector(`.tr[data-items~="${id}"]`);
+    if (!row) return;
+    const b = row.getBoundingClientRect();
+    if (b.top >= 72 && b.bottom <= innerHeight - 24) return;
+    row.scrollIntoView({ block: "nearest", behavior: MOTION ? "smooth" : "auto" });
+  };
+  duo.addEventListener("mouseover", e => { if (walking) return; const el = e.target.closest("[data-item], [data-items]"); if (el && itemIds(el).length) show(itemIds(el)[0]); });
+  duo.addEventListener("mouseleave", () => { if (!walking) show(pinned); });
+  duo.addEventListener("click", e => {
+    if (e.target.closest(".walk")) return;
+    const el = e.target.closest("[data-item], [data-items]");
+    if (!el || !itemIds(el).length) return;
+    if (walking) { clearTimeout(walking); walking = 0; }
+    pinned = pinned === itemIds(el)[0] ? null : itemIds(el)[0];
+    show(pinned);
+  });
+  card.querySelector(".walk")?.addEventListener("click", () => {
+    if (walking) { clearTimeout(walking); walking = 0; show(pinned); return; }
+    const ids = A.items.map(it => it.id);
+    let i = 0;
+    const step = () => {
+      if (i >= ids.length) { walking = 0; show(pinned); return; }
+      show(ids[i]); focus(ids[i]); i++;
+      walking = setTimeout(step, 2600);
+    };
+    step();
+  });
+  const relink = () => { if (duo.classList.contains("focus")) drawLinks(card, duo.dataset.active, true); };
+  addEventListener("scroll", relink, { passive: true });
+  addEventListener("resize", relink);
+}
+
+function drawLinks(card, id, still) {
+  const duo = card.querySelector(".duo"), svg = duo.querySelector(".links");
+  duo.dataset.active = id || "";
+  const R = duo.getBoundingClientRect();
+  svg.setAttribute("viewBox", `0 0 ${R.width} ${R.height}`);
+  svg.style.width = R.width + "px"; svg.style.height = R.height + "px";
+  if (!id || matchMedia("(max-width: 960px)").matches) { svg.innerHTML = ""; return; }
+  const item = duo.querySelector(`.item[data-item="${id}"]`);
+  if (!item) { svg.innerHTML = ""; return; }
+  const trap = item.classList.contains("trap"), from = item.querySelector(".badge").getBoundingClientRect();
+  const x2 = from.left - R.left, y2 = from.top + from.height / 2 - R.top, paths = [];
+  duo.querySelectorAll(`.tr[data-items~="${id}"]`).forEach(r => {
+    const b = r.getBoundingClientRect(), x1 = b.right - R.left - 4, y1 = b.top + b.height / 2 - R.top, mx = (x1 + x2) / 2;
+    paths.push(`<path class="${trap ? "trap" : "gold"}" d="M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2 - 2},${y2}"/>`);
+  });
+  svg.innerHTML = paths.join("");
+  if (!still && MOTION) svg.querySelectorAll("path").forEach(p => { const n = p.getTotalLength(); p.animate([{ strokeDasharray: n, strokeDashoffset: n }, { strokeDasharray: n, strokeDashoffset: 0 }], { duration: 520, easing: "cubic-bezier(.4,0,.2,1)" }); });
+}
+
+function target(s, c) {
+  const t = s.target, calls = (t.tool_calls || []).map(x => `${x.name}(${Object.entries(x.arguments || {}).map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(", ")})`).join("\n") || "[]";
+  return `<details class="tgt"><summary>★ ${tr().target} · ${esc(t.expected_action)}${s.kind === "side" ? ` · ${tr().sideOf} ` + esc(s.side_kind || "") : ""}</summary><div class="body">
+    <div class="k">text</div><div>${t.text ? esc(t.text) : tr().noReply}</div>
+    <div class="k">tool_calls</div><code>${esc(withVoices(calls, c))}</code>
+    <div class="k">thinking (training target)</div><div style="color:var(--muted)">${esc(withVoices(t.thinking || "", c))}</div>
+    ${t.thinking ? `<div class="fine">&lt;|Sn|&gt; is the n-th voice heard in the case; names inside the thinking may be romanized.</div>` : ""}</div></details>`;
+}
+
+function bgNote(s) {
+  if (s.background) return esc(tr().bgNote(s.background));
+  return s.background_dropped_reason ? esc(tr().noBgNote(s.background_dropped_reason)) : "";
+}
+
+function swap(el, html, animate) {
+  el.innerHTML = html;
+  if (animate && el.animate) el.animate([{ opacity: 0, transform: "translateY(6px)" }, { opacity: 1, transform: "none" }], { duration: 380, easing: "cubic-bezier(.2,.8,.2,1)" });
+}
+
+function placeInd(card) {
+  const b = card.querySelector('.tabs button[aria-pressed="true"]'), ind = card.querySelector(".tabs .ind");
+  if (!b || !b.offsetWidth) return;
+  Object.assign(ind.style, { width: b.offsetWidth + "px", height: b.offsetHeight + "px", transform: `translate(${b.offsetLeft}px, ${b.offsetTop}px)` });
+}
+
+// Switch the card to sample si. The two timelines part at `pivot`; what lies past it changes, in a wave that
+// starts at the pivot: main lines that the new sample lacks fade to ghosts, a side line grows out of its branch
+// point once the branch has lit up, and the transcript rows fold in or out.
+function select(card, c, si, instant) {
+  const prev = card.dataset.si === undefined ? si : +card.dataset.si;
+  if (prev === si && !instant) return;
+  const animate = !instant && MOTION, s = c.samples[si];
+  card.dataset.si = si;
+  card.classList.toggle("instant", !!instant);
+  const bt = j => c.samples[j].kind === "side" ? c.samples[j].branch_t : Infinity;
+  const pivot = Math.min(bt(prev), bt(si)), xp = isFinite(pivot) ? xAt(c, pivot) : X1;
+  card.querySelectorAll("svg [data-in]").forEach(el => {
+    const state = has(el, si) ? "" : has(el, 0) ? "ghost" : "off", was = el.dataset.state || "";
+    if (state === was && !instant) return;
+    const ripple = Math.max(0, +el.dataset.x - xp) / (X1 - X0) * 320;
+    el.style.transitionDelay = !animate ? "0ms" : state === "off" ? "0ms" : state === "" && !has(el, 0) ? "480ms" : `${60 + ripple}ms`;
+    el.classList.toggle("ghost", state === "ghost");
+    el.classList.toggle("off", state === "off");
+    el.dataset.state = state;
+  });
+  card.querySelectorAll(".tr").forEach(r => {
+    const gone = !has(r, si);
+    if (gone !== r.classList.contains("gone")) r.style.transitionDelay = animate && !gone ? "200ms" : "0ms";
+    r.classList.toggle("gone", gone);
+  });
+  card.querySelectorAll("svg [data-for]").forEach(el => el.classList.toggle("on", +el.dataset.for === si));
+  const hl = card.querySelector(`svg .tl-hl[data-for="${si}"]`);
+  if (animate && hl && hl.animate) {
+    const len = hl.getTotalLength(), lit = Math.min(len, Math.max(0, Math.min(xp, X1) - X0));
+    hl.animate([{ strokeDasharray: `${len}`, strokeDashoffset: len - lit }, { strokeDasharray: `${len}`, strokeDashoffset: 0 }], { duration: 650, easing: "cubic-bezier(.4,0,.2,1)" });
+  }
+  card.querySelectorAll(".tabs button").forEach(b => b.setAttribute("aria-pressed", +b.dataset.si === si));
+  card.querySelector(".tabs .ind").classList.toggle("side", s.kind === "side");
+  placeInd(card);
+  const tgt = card.querySelector(".tgtwrap"), open = [...tgt.querySelectorAll("details")].map(d => d.open);
+  swap(tgt, systemPanel(s) + memoryPanel(c) + toolsPanel(c) + rubricPanel(c), animate);
+  swap(card.querySelector(".gold"), goldPanel(s, c), animate);
+  tgt.querySelectorAll("details").forEach((d, i) => { if (open[i]) d.open = true; });
+  swap(card.querySelector(".note"), "", animate);  // the background note carries seed ids and dB bookkeeping
+  card.querySelector(".time").textContent = `0:00.0 / ${fmt(s.duration)}`;
+  card.querySelector("svg .playhead").setAttribute("opacity", 0);
+  if (instant) requestAnimationFrame(() => requestAnimationFrame(() => card.classList.remove("instant")));
+}
+
+// Playback: a sample's slices are decoded once and laid into one clip at their timeline offsets, so a line that
+// crosses a slice boundary plays without a gap. The clip plays in an <audio> element, which keeps the pitch when
+// the speed changes. A sample with stems plays the sum of its audible stem channels instead (all of them add up to
+// the slices), mixed again whenever the card's mute/solo choice changes.
+const RATES = [0.75, 1, 1.25, 1.5, 2];
+const player = { audio: new Audio(), card: null, sample: null, dmax: 1, rate: 1, raf: 0, cache: new Map() };
+player.audio.preservesPitch = player.audio.mozPreservesPitch = player.audio.webkitPreservesPitch = true;
+
+function wavUrl(data, rate) {
+  const n = data.length, buf = new ArrayBuffer(44 + n * 2), v = new DataView(buf);
+  const put = (o, str) => [...str].forEach((ch, i) => v.setUint8(o + i, ch.charCodeAt(0)));
+  put(0, "RIFF"); v.setUint32(4, 36 + n * 2, true); put(8, "WAVE"); put(12, "fmt "); v.setUint32(16, 16, true);
+  v.setUint16(20, 1, true); v.setUint16(22, 1, true); v.setUint32(24, rate, true); v.setUint32(28, rate * 2, true);
+  v.setUint16(32, 2, true); v.setUint16(34, 16, true); put(36, "data"); v.setUint32(40, n * 2, true);
+  for (let i = 0; i < n; i++) v.setInt16(44 + i * 2, Math.max(-1, Math.min(1, data[i])) * 0x7fff, true);
+  return URL.createObjectURL(new Blob([buf], { type: "audio/wav" }));
+}
+
+// Mute and solo per card: with any channel soloed only the soloed ones play, otherwise every unmuted one.
+const mixOf = card => card._mix || (card._mix = { mute: new Set(), solo: new Set() });
+const audible = (card, ch) => { const m = mixOf(card); return m.solo.size ? m.solo.has(ch) : !m.mute.has(ch); };
+const clipKey = (card, s) => s.stems ? `${s.id}|${s.stems.channels.filter(ch => audible(card, ch)).join("|")}` : s.id;
+
+// Static site: one mono Opus file per stem channel, decoded (and resampled) to the sample's rate.
+function stemsFor(s) {
+  const key = "stems:" + s.stems.files.join("|");
+  if (!player.cache.has(key)) player.cache.set(key, Promise.all(s.stems.files.map(f => fetch(f)
+    .then(r => { if (!r.ok) throw new Error(`${f}: ${r.status}`); return r.arrayBuffer(); })
+    .then(b => new OfflineAudioContext(1, 1, s.rate).decodeAudioData(b)))));
+  return player.cache.get(key);
+}
+
+function clipFor(s, card) {
+  if (s.stems) {
+    // The channels are read now: a later click must not change a mix that is still being made.
+    const key = clipKey(card, s), on = s.stems.channels.map(ch => audible(card, ch));
+    if (!player.cache.has(key)) player.cache.set(key, stemsFor(s).then(bufs => {
+      const data = new Float32Array(Math.ceil(s.duration * s.rate));
+      s.stems.channels.forEach((ch, i) => {
+        if (!on[i] || !bufs[i]) return;
+        const x = bufs[i].getChannelData(0), n = Math.min(x.length, data.length);
+        for (let j = 0; j < n; j++) data[j] += x[j];
+      });
+      return wavUrl(data, s.rate);
+    }));
+    return player.cache.get(key);
+  }
+  if (!player.cache.has(s.id)) player.cache.set(s.id, (async () => {
+    const ctx = new OfflineAudioContext(1, 1, s.rate);
+    const parts = await Promise.all(s.slices.map(x => fetch(x.audio).then(r => r.arrayBuffer()).then(b => ctx.decodeAudioData(b))));
+    const data = new Float32Array(Math.ceil(s.duration * s.rate));
+    parts.forEach((buf, i) => {
+      const ch = buf.getChannelData(0), at = Math.round(s.slices[i].t0 * s.rate), n = Math.max(0, Math.min(ch.length, data.length - at));
+      // The assistant's own channel is added on top of the room slice it shares the span with.
+      if (s.slices[i].mix) for (let j = 0; j < n; j++) data[at + j] += ch[j];
+      else data.set(ch.subarray(0, n), at);
+    });
+    return wavUrl(data, s.rate);
+  })());
+  return player.cache.get(s.id);
+}
+
+function setBtn(card, on, text) {
+  const btn = card.querySelector(".play");
+  btn.classList.toggle("on", on);
+  btn.lastChild.textContent = text || (on ? tr().pause : tr().play);
+}
+
+function stop(keep) {
+  cancelAnimationFrame(player.raf);
+  player.audio.pause();
+  if (!keep && player.audio.src) try { player.audio.currentTime = 0; } catch (e) {}
+  if (player.card) setBtn(player.card, false);
+}
+
+async function seek(card, c, t) {
+  const s = c.samples[+card.dataset.si];
+  if (player.card && (player.card !== card || player.sample !== s)) stop(); else stop(true);
+  player.card = card; player.sample = s; player.dmax = caseDur(c);
+  setBtn(card, true, tr().loading);
+  const key = clipKey(card, s), url = await clipFor(s, card), a = player.audio;
+  if (player.card !== card || player.sample !== s) return;
+  if (a.dataset.id !== key) {
+    a.src = url; a.dataset.id = key;
+    await new Promise(r => a.addEventListener("loadedmetadata", r, { once: true }));
+    if (player.card !== card || player.sample !== s) return;
+  }
+  a.defaultPlaybackRate = a.playbackRate = player.rate;
+  a.currentTime = Math.max(0, Math.min(t, s.duration - 0.05));
+  try { await a.play(); } catch (e) { setBtn(card, false); return; }
+  setBtn(card, true);
+  tick();
+}
+
+player.audio.addEventListener("ended", () => { cancelAnimationFrame(player.raf); if (player.card) setBtn(player.card, false); });
+
+function tick() {
+  const s = player.sample, card = player.card, a = player.audio;
+  if (!s) return;
+  const t = Math.min(a.currentTime, s.duration);
+  const head = card.querySelector("svg .playhead");
+  const x = X0 + (X1 - X0) * Math.min(t / player.dmax, 1);
+  head.setAttribute("x1", x); head.setAttribute("x2", x); head.setAttribute("opacity", 1);
+  card.querySelector(".time").textContent = `${fmt(t)} / ${fmt(s.duration)}`;
+  let last = null;
+  card.querySelectorAll(".tr:not(.gone)").forEach(r => {
+    const on = +r.dataset.t0 <= t && t < +r.dataset.t1;
+    if (on || r.classList.contains("now")) r.querySelectorAll(".w").forEach(w => {
+      w.classList.toggle("on", on && +w.dataset.w0 <= t && t < Math.max(+w.dataset.w1, +w.dataset.w0 + 0.08));
+      w.classList.toggle("past", on && +w.dataset.w1 <= t);
+    });
+    r.classList.toggle("now", on);
+    if (on) last = r;
+  });
+  if (last && !a.paused) {
+    const box = card.querySelector(".trans"), top = last.offsetTop - box.offsetTop;
+    if (top < box.scrollTop || top > box.scrollTop + box.clientHeight - 40) box.scrollTop = top - 60;
+  }
+  if (!a.paused) player.raf = requestAnimationFrame(tick);
+}
+
+function setRate(r) {
+  player.rate = r;
+  player.audio.defaultPlaybackRate = player.audio.playbackRate = r;
+  document.querySelectorAll(".rate").forEach(el => { el.value = String(r); });
+}
+
+// The page loads data/index.json (one row per case) and lists the cases of the chosen language, pattern by pattern
+// (DATA.patterns order) under a heading per pattern; a case's own file is fetched when its card nears the viewport.
+const CASES = new Map();
+let INDEX = null;
+const loadCase = file => {
+  if (!CASES.has(file)) CASES.set(file, fetch(file).then(r => { if (!r.ok) throw new Error(`${file}: ${r.status}`); return r.json(); }));
+  return CASES.get(file);
+};
+const observer = new IntersectionObserver(entries => entries.forEach(en => {
+  if (!en.isIntersecting) return;
+  const card = en.target;
+  observer.unobserve(card);
+  loadCase(card.dataset.file).then(c => { if (card.isConnected) renderCase(card, c, +card.dataset.ci); })
+    .catch(err => { card.querySelector(".note").textContent = String(err); });
+}), { rootMargin: "600px 0px" });
+
+// The card's header row: the pattern name and readable chips. Shared by the pending card.
+const LANG_NAME = { en: "English", "zh-CN": "Chinese" };
+const caseHead = (title, chips) => `<div class="chead">
+  <div class="ctitle"><h3>${esc(title)}</h3><div class="chips">${chips.map(x => `<span class="chip${x.cls ? " " + x.cls : ""}">${esc(x.text)}</span>`).join("")}</div></div></div>`;
+
+function build() {
+  stop(); player.card = null; player.sample = null;
+  observer.disconnect();
+  document.body.classList.remove("has-floor", "has-overlay", "has-bg", "has-side");
+  document.querySelectorAll("[data-i]").forEach(el => { el.textContent = tr()[el.dataset.i]; });
+  document.querySelectorAll(".langsw button").forEach(b => b.setAttribute("aria-pressed", b.dataset.lang === LANG));
+  const root = document.getElementById("cases");
+  root.innerHTML = "";
+  let ci = 0;
+  DATA.patterns.forEach(([pattern, title, note]) => {
+    const cs = INDEX.cases.filter(e => e.pattern === pattern && e.language === CASE_LANG[LANG]);
+    if (!cs.length) return;
+    const head = document.createElement("header");
+    head.className = "pattern-head";
+    head.innerHTML = `<h2>${esc(title)}</h2><p class="fd-desc">${esc(note)}</p>`;
+    root.appendChild(head);
+    cs.forEach(e => {
+      const card = document.createElement("section");
+      card.className = "case pending";
+      card.lang = e.language;
+      card.dataset.file = e.file;
+      card.dataset.ci = ci++;
+      card.innerHTML = `<div class="figbox">${caseHead(e.pattern_title, [{ text: LANG_NAME[e.language] || e.language }, { text: tr().mainPeople(e.speakers) }])}</div>
+      <div class="note">${tr().loading}…</div>`;
+      root.appendChild(card);
+      observer.observe(card);
+    });
+  });
+}
+document.querySelectorAll(".langsw button").forEach(b => b.addEventListener("click", () => {
+  if (b.dataset.lang === LANG) return;
+  LANG = b.dataset.lang;
+  build();
+}));
+
+// The channel strip: one M (mute) and S (solo) pair per stem channel, coloured like its lane.
+function channelStrip(c) {
+  const stems = c.samples.find(s => s.stems)?.stems;
+  if (!stems) return "";
+  const color = ch => ch === "assistant" ? "var(--ink)" : ch === "background" ? "var(--bg)"
+    : COLORS[Math.max(0, c.participants.findIndex(p => p.name === ch)) % 5];
+  // The background stem is the ambience bed alone when the case places no background speech.
+  const name = ch => ch === "assistant" ? tr().assistant : ch === "background" ? (c.background_speakers.length ? tr().chBg : "Room ambience") : ch;
+  return `<div class="chans">${stems.channels.map(ch => `<span class="chan" data-ch="${esc(ch)}" style="--c:${color(ch)}">
+    <span class="dot"></span><span class="name">${esc(name(ch))}</span>
+    <button type="button" class="m" aria-pressed="false" title="${tr().mute}" aria-label="${tr().mute} ${esc(name(ch))}">M</button>
+    <button type="button" class="s" aria-pressed="false" title="${tr().solo}" aria-label="${tr().solo} ${esc(name(ch))}">S</button></span>`).join("")}</div>`;
+}
+
+function showMix(card) {
+  const m = mixOf(card);
+  card.querySelectorAll(".chan").forEach(el => {
+    const ch = el.dataset.ch;
+    el.classList.toggle("off", !audible(card, ch));
+    el.querySelector(".m").setAttribute("aria-pressed", String(m.mute.has(ch)));
+    el.querySelector(".s").setAttribute("aria-pressed", String(m.solo.has(ch)));
+  });
+  card.querySelectorAll("svg .evt[data-ch]").forEach(el => el.classList.toggle("muted", !audible(card, el.dataset.ch)));
+}
+
+function renderCase(card, c, ci) {
+  const s0 = c.samples[0], L = layout(c);
+  card.className = "case";
+  card.dataset.pattern = c.pattern;
+  const enrolled = c.participants.filter(p => p.label).length;
+  const chips = [{ text: LANG_NAME[c.language] || c.language }, { text: tr().mainPeople(c.participants.length) }];
+  if (s0.background) chips.push({ text: "background chat", cls: "bgc" });
+  if (c.private_memory) chips.push({ text: "private memory" });
+  card.innerHTML = `<div class="figbox">${caseHead(c.pattern_title || c.pattern, chips)}
+    <div class="bar"><div class="tabs"${c.samples.length > 1 ? "" : " hidden"}><span class="ind"></span>${c.samples.map((s, si) => `<button type="button" data-si="${si}">${esc(sampleLabel(s))}</button>`).join("")}</div>
+      <div class="ctrl"><button type="button" class="play"><span>${tr().play}</span></button>
+        <select class="rate" aria-label="${tr().speed}">${RATES.map(r => `<option value="${r}"${r === player.rate ? " selected" : ""}>${r}×</option>`).join("")}</select>
+        <span class="time"></span></div>
+      ${channelStrip(c)}</div>
+    <div class="fig"><svg viewBox="0 0 ${W} ${L.height}" role="img" aria-label="${esc(c.pattern)} ${tr().timeline}">${fan(c, L)}${lanesSvg(c, L, ci)}</svg></div></div>
+    <div class="note"></div><div class="duo"><div class="trans">${transcript(c)}</div><aside class="gold"></aside><svg class="links" aria-hidden="true"></svg></div><div class="tgtwrap"></div>`;
+  if (hasFloor(c)) document.body.classList.add("has-floor");
+  if (c.events.some(e => e.kind === "overlay")) document.body.classList.add("has-overlay");
+  if (c.events.some(e => e.kind === "bg")) document.body.classList.add("has-bg");
+  if (c.samples.length > 1) document.body.classList.add("has-side");
+  select(card, c, 0, true);
+  wireAnnot(card, c);
+  card.querySelector(".chans")?.addEventListener("click", e => {
+    const b = e.target.closest(".chan button");
+    if (!b) return;
+    const set = mixOf(card)[b.classList.contains("m") ? "mute" : "solo"], ch = b.closest(".chan").dataset.ch;
+    if (set.has(ch)) set.delete(ch); else set.add(ch);
+    showMix(card);
+    // Mixed again from where it is, so the change is heard at once.
+    if (player.card === card && !player.audio.paused) seek(card, c, player.audio.currentTime);
+  });
+  card.querySelector(".rate").addEventListener("change", e => setRate(+e.target.value));
+  card.querySelector(".play").addEventListener("click", () => {
+    if (player.card === card && !player.audio.paused) { stop(true); return; }
+    const s = c.samples[+card.dataset.si], same = player.card === card && player.sample === s;
+    seek(card, c, same && !player.audio.ended ? player.audio.currentTime : 0);
+  });
+  card.addEventListener("click", e => {
+    // The card carries data-si too (its current sample), so only a tab or a timeline-map branch is a pick.
+    const pick = e.target.closest("[data-si]");
+    if (pick && pick !== card) {
+      const si = +pick.dataset.si;
+      if (si === +card.dataset.si) return;
+      if (player.card === card) { stop(); player.sample = null; }
+      select(card, c, si);
+      return;
+    }
+    if (e.target.closest(".badge, .item, .gold")) return;
+    const el = e.target.closest(".evt, .tr");
+    if (!el || el.dataset.t === undefined && el.dataset.t0 === undefined) return;
+    seek(card, c, +(el.dataset.t ?? el.dataset.t0));
+  });
+  placeInd(card);
+}
+
+addEventListener("resize", () => document.querySelectorAll("section.case:not(.pending)").forEach(placeInd));
+if (document.fonts) document.fonts.ready.then(() => document.querySelectorAll("section.case:not(.pending)").forEach(placeInd));
+fetch(DATA.index).then(r => r.json()).then(index => {
+  INDEX = index;
+  build();
+}).catch(err => { document.getElementById("cases").textContent = `index: ${err}`; });
+</script>
+</body>
+</html>
