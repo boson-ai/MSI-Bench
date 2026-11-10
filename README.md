@@ -4,6 +4,7 @@
   <a href="https://arxiv.org/abs/2609.24812"><img src="https://img.shields.io/badge/arXiv-2609.24812-b31b1b.svg" alt="arXiv"></a>
   <a href="https://huggingface.co/datasets/M2cha4l1124/MSI-Bench"><img src="https://img.shields.io/badge/HuggingFace-Datasets-yellow.svg" alt="HuggingFace Datasets"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a>
+  <a href="https://boson-ai.github.io/MSI-Bench/"><img src="https://img.shields.io/badge/Demo-GitHub%20Pages-2ea44f.svg" alt="Demo"></a>
 </p>
 
 Evaluation code for **MSI-Bench** (Multi-Speaker Interaction Benchmark): the
