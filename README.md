@@ -7,6 +7,14 @@
   <a href="https://boson-ai.github.io/MSI-Bench/"><img src="https://img.shields.io/badge/Demo-GitHub%20Pages-2ea44f.svg" alt="Demo"></a>
 </p>
 
+## Updates
+
+- **2026-11-12** MSI-Bench v2 released: 624 cases, 2 to 4 speakers, a full-duplex floor layer and real room acoustics. Published under `v2/` on the [HuggingFace dataset](https://huggingface.co/datasets/M2cha4l1124/MSI-Bench/tree/main/v2) (CC BY-NC 4.0). v1 stays at the dataset root.
+- **2026-09-21** MSI-Bench v1 released with the paper ([arXiv:2609.24812](https://arxiv.org/abs/2609.24812)): 1,152 cases, 2 or 3 speakers (CC BY 4.0).
+
+> [!WARNING]
+> **v1 and v2 scores are not comparable.** v2 has different cases, longer multi-speaker room audio, a different answer protocol and a different judge. Report them separately and always name the version.
+
 Evaluation code for **MSI-Bench** (Multi-Speaker Interaction Benchmark): the
 prediction runners, deterministic scoring, LLM answer judge, and the table
 aggregation used in the paper *MSI-Bench: Evaluating Multi-Speaker Voice
@@ -15,10 +23,27 @@ Interaction for Collaborative AI Agents*.
 MSI-Bench tests whether a voice assistant in a multi-speaker conversation can
 track who said what, to whom it applies, and who may change it, and then take
 the correct next action: answer, call a tool, refuse, ask, or stay silent. It
-has 1,152 base test cases (576 English, 576 Mandarin) over 8 behavior settings
-and 6 patterns, with 2 or 3 human speakers per case.
+has 1,152 base test cases over 8 behavior settings
+and 6 patterns, with 2 or 3 human speakers per case. **MSI-Bench v2** (624
+cases, 2 to 4 speakers, full-duplex floor layer, real room acoustics) is
+published; see
+[What's new in v2](#whats-new-in-v2).
 
 ## Leaderboard
+
+**v1 and v2 scores are not comparable**: different cases, audio, protocol and judge. Each chart stands on its own.
+
+<p align="center"><img src="docs/img/leaderboard_v2.png" alt="MSI-Bench v2 leaderboard: all-pass rate by language" width="820"></p>
+
+v2: 624 cases, English and Mandarin APR per model, judge gpt-6-luna. Full
+columns (ARS, Tool, per-pattern APR) are in the v2 results table below.
+
+<p align="center"><img src="docs/img/leaderboard_v1.png" alt="MSI-Bench v1 leaderboard: all-pass rate by language" width="820"></p>
+
+v1: 1,152 cases, results from the paper. † marks thinking or reasoning enabled.
+
+<details>
+<summary>v1 results tables (English, Mandarin)</summary>
 
 English results from the paper. APR has a 95% Wilson interval. Bold marks the
 best hosted and the best open-weight result per column. † marks reasoning or
@@ -45,8 +70,7 @@ thinking enabled. ‡ marks configurations affected by output-format errors.
 | Phi-4-Multimodal | 5.4 ±1.9 | 32.0 | 0.0 | – | 100.0 | 0.0 | 32.3 | 0.0 | 0.0 | 0.0 | 0.0 |
 | Qwen2-Audio-7B | 1.6 ±1.1 | 11.8 | 0.0 | – | 5.7 | 0.0 | 9.4 | 0.0 | 0.0 | 0.0 | 0.0 |
 
-<details>
-<summary>Mandarin results</summary>
+**Mandarin**
 
 | Model | APR | ARS | Tool | BIR ↑ | PRR ↓ | Auth. | Discl. | Prior. | Seq. | Scope | Retr. |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -68,6 +92,29 @@ thinking enabled. ‡ marks configurations affected by output-format errors.
 | Phi-4-Multimodal | 6.4 | 33.7 | 0.3 | – | 99.5 | 1.0 | **36.5** | 1.0 | 0.0 | 0.0 | 0.0 |
 | Qwen2-Audio-7B | 0.5 | 12.4 | 0.0 | – | 0.0 | 0.0 | 3.1 | 0.0 | 0.0 | 0.0 | 0.0 |
 
+
+</details>
+
+<details>
+<summary>v2 results table (624 cases, judge gpt-6-luna)</summary>
+
+| Model | APR (±95%) | ARS | Tool | Format errors | Auth. | Discl. | Prior. | Seq. | Scope | Retr. |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Qwen3-Omni-30B | 21.2 ±3.2 | 40.3 | 22.4 | 39 | 33.7 | 56.7 | 23.1 | 2.9 | 0.0 | 10.6 |
+| GPT Audio Mini | 18.3 ±3.0 | 38.2 | 21.3 | 0 | 33.7 | 47.1 | 23.1 | 1.0 | 1.0 | 3.8 |
+| MiMo-Audio-7B | 12.2 ±2.6 | 34.6 | 11.6 | 15 | 22.1 | 40.4 | 8.7 | 0.0 | 0.0 | 1.9 |
+| Qwen2.5-Omni-7B | 11.9 ±2.5 | 32.0 | 12.4 | 39 | 24.0 | 35.6 | 5.8 | 1.9 | 0.0 | 3.8 |
+| MiMo-Audio-7B † | 11.4 ±2.5 | 34.0 | 11.3 | 48 | 20.2 | 33.7 | 13.5 | 0.0 | 0.0 | 1.0 |
+| Phi-4-Multimodal | 5.9 ±1.9 | 34.5 | 1.1 | 12 | 9.6 | 25.0 | 1.0 | 0.0 | 0.0 | 0.0 |
+| Gemma 4-12B | 3.8 ±1.5 | 23.1 | 1.1 | 2 | 4.8 | 17.3 | 1.0 | 0.0 | 0.0 | 0.0 |
+| Gemma 4-12B † | 3.8 ±1.5 | 21.9 | 1.6 | 0 | 2.9 | 18.3 | 1.0 | 0.0 | 0.0 | 1.0 |
+| Qwen2-Audio-7B | 0.2 ±0.4 | 14.4 | 0.0 | 0 | 0.0 | 1.0 | 0.0 | 0.0 | 0.0 | 0.0 |
+
+Protocol: hosted models through native tool calling, open-weight models through
+vLLM with schema-constrained decoding (`IB_LOCAL_GUIDED_JSON=1`); one audio
+message per room block, earlier assistant replies as text; judge gpt-6-luna.
+Format errors are cases with no parseable prediction (counted as failures).
+
 </details>
 
 **Metrics** (all in %):
@@ -84,6 +131,39 @@ thinking enabled. ‡ marks configurations affected by output-format errors.
 - **Patterns**: Auth. = speaker authority constraint, Discl. = selective
   disclosure, Prior. = constraint prioritization, Seq. = sequential constraint
   integration, Scope = scope tracking, Retr. = background speech retrieval.
+
+## What's new in v2
+
+MSI-Bench v2 keeps the six interaction patterns of v1 and rebuilds the audio
+around what a room-scale assistant actually hears. 624 cases, two languages.
+
+**A full-duplex floor layer.** Backchannels ("mm-hm", "right"),
+interruptions, cut-off sentences, failed attempts to take the floor, and the
+assistant's own backchannels in the heard mix. Earlier assistant replies are
+part of the room audio history, in the assistant's own voice. About a third of
+the cases add an unrelated background conversation between people who are not
+part of the task; those voices take their own speaker labels, so the model has
+to tell who is talking to it.
+
+**Real room acoustics .** Instead of DSP reverb, we use room impulse responses (RIRs) to render the audio, so that each sound carries the reflections, reverberation and coloration of a real physical space.
+
+**Five times the voices, three times the ambiences.** 480 cloned Common Voice
+voices and 249 Freesound ambience recordings. Every ambience
+excerpt had its foreground speech removed with a source-separation model
+(BS-RoFormer vocal stem subtraction) before mixing, so the only voices in a case
+are the ones the case puts there.
+
+**Fewer cases, more coverage, cheaper to run.** 624 cases instead of 1,152. At
+equal sample size v2 uses 4 to 5 times as many voices, 2.7 times as many
+ambiences, and its individual utterances are more semantically diverse (Vendi
+score), so a run represents more conditions for roughly half the audio.
+
+**Tools the way models see them today.** Tool definitions ship in Anthropic
+`input_schema` form together with the system prompt used at generation time.
+In the scope-tracking and sequential-constraint patterns, gold tool calls bind
+each constraint to its owner by voice label (`<|S1|>`, `<|S2|>`, …, numbered in
+order of first appearance), so speaker attribution is scored inside the tool
+call itself.
 
 ## Layout
 
