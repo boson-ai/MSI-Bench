@@ -100,6 +100,8 @@ thinking enabled. ‡ marks configurations affected by output-format errors.
 
 | Model | APR (±95%) | ARS | Tool | Format errors | Auth. | Discl. | Prior. | Seq. | Scope | Retr. |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Gemini 3.8 Flash † | 41.8 ±3.9 | 61.0 | 45.3 | 0 | 51.0 | 80.8 | 52.9 | 26.0 | 20.2 | 20.2 |
+| GPT Realtime 2.1 (medium) † | 35.3 ±3.7 | 57.0 | 38.0 | 0 | 50.0 | 68.3 | 52.9 | 9.6 | 20.2 | 10.6 |
 | Qwen3-Omni-30B | 21.2 ±3.2 | 40.3 | 22.4 | 39 | 33.7 | 56.7 | 23.1 | 2.9 | 0.0 | 10.6 |
 | GPT Audio Mini | 18.3 ±3.0 | 38.2 | 21.3 | 0 | 33.7 | 47.1 | 23.1 | 1.0 | 1.0 | 3.8 |
 | MiMo-Audio-7B | 12.2 ±2.6 | 34.6 | 11.6 | 15 | 22.1 | 40.4 | 8.7 | 0.0 | 0.0 | 1.9 |
@@ -110,10 +112,12 @@ thinking enabled. ‡ marks configurations affected by output-format errors.
 | Gemma 4-12B † | 3.8 ±1.5 | 21.9 | 1.6 | 0 | 2.9 | 18.3 | 1.0 | 0.0 | 0.0 | 1.0 |
 | Qwen2-Audio-7B | 0.2 ±0.4 | 14.4 | 0.0 | 0 | 0.0 | 1.0 | 0.0 | 0.0 | 0.0 | 0.0 |
 
-Protocol: hosted models through native tool calling, open-weight models through
-vLLM with schema-constrained decoding (`IB_LOCAL_GUIDED_JSON=1`); one audio
-message per room block, earlier assistant replies as text; judge gpt-6-luna.
-Format errors are cases with no parseable prediction (counted as failures).
+Protocol: Gemini and GPT Audio through native tool calling (Gemini with its
+default thinking), GPT Realtime through the Realtime API with reasoning effort
+medium, open-weight models through vLLM with schema-constrained decoding
+(`IB_LOCAL_GUIDED_JSON=1`); one audio message per room block, earlier assistant
+replies as text; judge gpt-6-luna. † thinking or reasoning enabled. Format
+errors are cases with no parseable prediction (counted as failures).
 
 </details>
 
