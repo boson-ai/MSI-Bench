@@ -1,6 +1,6 @@
 # Calling spec: vllm serve --config /config/vllm-audio.yaml
 # Serves Qwen2.5 Omni thinker output as text.
-model: /models/Qwen2.5-Omni-7B
+model: <path-to-checkpoint>/Qwen2.5-Omni-7B
 served-model-name: Qwen2.5-Omni-7B
 tensor-parallel-size: 1
 dtype: bfloat16

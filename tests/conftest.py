@@ -64,6 +64,20 @@ def _deterministic_atom_passed(item: dict, answer_text: str) -> bool:
     return criterion in answer_text
 
 
+@pytest.fixture(autouse=True)
+def _no_developer_dotenv(monkeypatch) -> None:
+    """Keep the developer's `.env` out of os.environ when tests call `ib.cli.main`."""
+    monkeypatch.setattr("ib.cli.environment.load_cli_environment", lambda: None)
+
+
 @pytest.fixture
 def det_judge() -> DeterministicJudgeProvider:
     return DeterministicJudgeProvider()
+
+
+@pytest.fixture(autouse=True)
+def _no_claude_direct_route(monkeypatch):
+    """A CLAUDE_API_KEY in the developer's env would send Claude-model requests to the Anthropic API
+    (ib.llm.claude_direct) and past the fakes that tests install on the OpenRouter path."""
+    monkeypatch.delenv("CLAUDE_API_KEY", raising=False)
+

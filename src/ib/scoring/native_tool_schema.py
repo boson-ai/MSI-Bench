@@ -8,8 +8,11 @@ Calling spec:
     live_tools = gemini_live_tools(bundle)
 
 Inputs are model-visible harness function descriptors. Outputs are deterministic
-JSON Schema declarations plus a provider-name-to-harness-name map. No gold calls
-are consumed, and the module has no side effects.
+JSON Schema declarations plus a provider-name-to-harness-name map. A declaration's
+description is the function's own `description`, and each parameter carries its
+`argument_descriptions` entry (argument_schema); a function without a description
+falls back to a generic placeholder description. No gold calls are consumed, and the
+module has no side effects.
 """
 
 from __future__ import annotations
@@ -41,6 +44,10 @@ STRING_FORMATS: tuple[tuple[re.Pattern[str], str, str], ...] = (
     ),
 )
 STRING_FORMAT_HINTS: tuple[str, ...] = ("string HH:MM 24h", "string YYYY-MM-DD")
+# `voices`: whose request a call carries, as the voices the tested model tells apart
+# (one or more <|S<n>|> labels) or ["all"] for everyone present.
+VOICES_DESCRIPTOR = "voices"
+VOICE_VALUE_PATTERN = r"^(?:<\|S[1-9]\d*\|>|all)$"
 
 
 @dataclass(frozen=True)
@@ -49,6 +56,41 @@ class NativeToolBundle:
 
     declarations: list[dict[str, Any]]
     name_map: dict[str, str]
+
+
+def native_bundle_for_row(row: dict[str, Any]) -> NativeToolBundle:
+    """Return the row's native declarations: from Anthropic-format logic_tools (v2 release rows)
+    when present, else from the legacy logic_available_functions descriptors."""
+
+    tools = row.get("logic_tools")
+    if isinstance(tools, list) and tools:
+        return build_native_tool_bundle_from_tools(tools)
+    return build_native_tool_bundle(row.get("logic_available_functions"))
+
+
+def build_native_tool_bundle_from_tools(tools: list[dict[str, Any]]) -> NativeToolBundle:
+    """Return native declarations for Anthropic-format tool definitions ({name, description, input_schema})."""
+
+    declarations: list[dict[str, Any]] = []
+    name_map: dict[str, str] = {}
+    used_names: set[str] = set()
+    for index, tool in enumerate(tools):
+        if not isinstance(tool, dict) or not isinstance(tool.get("name"), str) or not tool["name"].strip():
+            raise ValueError(f"tool #{index + 1} needs a non-blank name")
+        schema = tool.get("input_schema")
+        if not isinstance(schema, dict):
+            raise ValueError(f"tool {tool['name']!r} needs an input_schema object")
+        original_name = tool["name"].strip()
+        provider_name = _safe_tool_name(original_name, index=index, used_names=used_names)
+        name_map[provider_name] = original_name
+        declarations.append(
+            {
+                "name": provider_name,
+                "description": str(tool.get("description") or ""),
+                "parameters": {**schema, "additionalProperties": False},
+            }
+        )
+    return NativeToolBundle(declarations=declarations, name_map=name_map)
 
 
 def build_native_tool_bundle(available_functions: Any) -> NativeToolBundle:
@@ -76,8 +118,10 @@ def build_native_tool_bundle(available_functions: Any) -> NativeToolBundle:
             raise ValueError(f"available function {original_name!r} has invalid argument names")
         provider_name = _safe_tool_name(original_name, index=index, used_names=used_names)
         name_map[provider_name] = original_name
+        argument_descriptions = raw_function.get("argument_descriptions") or {}
         properties = {
-            key: descriptor_json_schema(value) for key, value in raw_arguments.items()
+            key: argument_schema(value, argument_descriptions.get(key))
+            for key, value in raw_arguments.items()
         }
         parameters: dict[str, Any] = {
             "type": "object",
@@ -90,7 +134,7 @@ def build_native_tool_bundle(available_functions: Any) -> NativeToolBundle:
         declarations.append(
             {
                 "name": provider_name,
-                "description": (
+                "description": raw_function.get("description") or (
                     f"Execute {original_name} for the current assistant request. "
                     f"The original action name is {original_name}."
                 ),
@@ -142,6 +186,14 @@ def descriptor_json_schema(value: Any) -> dict[str, Any]:
         or re.search(r"\s+or\s+null$", lowered)
         or re.match(r"^(?:string|number|integer|boolean)_or_null(?:\s|$)", lowered)
     )
+    if lowered == VOICES_DESCRIPTOR:
+        return {
+            "type": "array",
+            "items": {"type": "string", "pattern": VOICE_VALUE_PATTERN},
+            "minItems": 1,
+            "uniqueItems": True,
+            "description": 'One or more speaker voice labels such as "<|S2|>", or ["all"] for everyone present',
+        }
     object_match = _OBJECT_ARRAY_RE.fullmatch(raw)
     if object_match:
         fields = _object_fields_schema(object_match.group(1))
@@ -183,6 +235,23 @@ def descriptor_json_schema(value: Any) -> dict[str, Any]:
             schema.update({"pattern": pattern, "description": description})
             break
     return _nullable_schema(schema, nullable)
+
+
+def argument_schema(descriptor: Any, description: str | None = None) -> dict[str, Any]:
+    """Return descriptor_json_schema(descriptor) carrying the argument's own description.
+
+    With a non-blank `description` the schema's "description" holds it (a string
+    format's hint, such as "24-hour time in HH:MM format", stays in the text too);
+    with none, the result equals descriptor_json_schema(descriptor).
+    """
+    schema = descriptor_json_schema(descriptor)
+    if not isinstance(description, str) or not description.strip():
+        return schema
+    text = description.strip()
+    hint = schema.get("description")
+    if hint and hint.lower() not in text.lower():
+        text = f"{text} Format: {hint}."
+    return {**schema, "description": text}
 
 
 def _object_fields_schema(raw_fields: str) -> dict[str, Any]:

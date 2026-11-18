@@ -9,11 +9,13 @@ Deterministic: returns provider metadata and per-request OpenAI-compatible
 
 from __future__ import annotations
 
+import os
+
 QWEN35_PROVIDER = "qwen3_5"
 QWEN35_THINKING_PROVIDER = "qwen3_5_thinking"
 DEFAULT_LLM_PROVIDER = "openai"
 QWEN35_MODEL = "qwen3.5-397b"
-QWEN35_BASE_URL = "http://localhost:26000/v1"
+QWEN35_BASE_URL = os.environ.get("IB_QWEN35_BASE_URL", "http://localhost:26000/v1")
 QWEN35_MAX_CONTEXT_TOKENS = 120_000
 QWEN35_MAX_OUTPUT_TOKENS = 8_192
 

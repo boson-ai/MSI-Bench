@@ -1,11 +1,12 @@
 [project]
 name = "msi-bench-eval"
-version = "0.1.0"
-description = "MSI-Bench evaluation harness: audio multi-speaker interaction benchmark scoring and judging."
+version = "0.2.0"
+description = "MSI-Bench evaluation harness: audio multi-speaker interaction benchmark scoring and judging (v1 and v2)."
 requires-python = ">=3.10"
 dependencies = [
     "httpx>=0.27.0",
     "jinja2>=3.1.6",
+    "numpy>=1.26.0",
     "openai>=1.40.0",
     "pydantic>=2.0.0",
     "python-dotenv>=1.0.0",
@@ -15,6 +16,7 @@ dependencies = [
 
 [project.optional-dependencies]
 gemini = ["google-genai>=1.0.0"]
+claude = ["anthropic>=0.40.0"]
 
 [project.scripts]
 ib = "ib.cli.main:main"

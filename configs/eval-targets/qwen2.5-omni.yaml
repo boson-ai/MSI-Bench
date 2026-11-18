@@ -1,0 +1,4 @@
+base:
+  - name: qwen2.5-omni-7b
+    provider: local
+    model: Qwen2.5-Omni-7B

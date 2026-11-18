@@ -19,8 +19,8 @@ import time
 from pathlib import Path
 from typing import Any
 
-from ib.io import canonical_json, write_jsonl
-from ib.predictions import PredictionRow, read_predictions
+from ib.io import write_jsonl
+from ib.scoring.predictions import PredictionRow, read_predictions
 from ib.scoring.local_audio_models import (
     LocalAudioModelSpec,
     local_audio_base_url,
@@ -40,9 +40,10 @@ from ib.scoring.openai_understanding import (
     _user_prompt_for,
     _usage_value,
 )
-from ib.scoring.multiturn_audio import history_messages
+from ib.scoring.multiturn_audio import history_messages, final_turn_note
 from ib.scoring.realtime_prediction_tool import emit_prediction_tool
 from ib.scoring.transcript_render import render_visible_transcript
+from ib.scoring.case_pool import PROVIDER_LOCK, predict_rows
 from ib.scoring.progress import print_eval_case_progress
 
 
@@ -224,17 +225,18 @@ class LocalUnderstandingProvider:
             audio_paths = _audio_paths_for(manifest_row, manifest_path)
             if not audio_paths:
                 raise UnderstandingProviderError(f"manifest row {cell_id!r} has no audio paths")
-            if (
-                self.model_spec is not None
-                and self.model_spec.max_audio_clips is not None
-                and len(audio_paths) > self.model_spec.max_audio_clips
-            ):
-                raise UnderstandingProviderError(
-                    f"{self.model} supports at most {self.model_spec.max_audio_clips} audio "
-                    f"clip(s) per request; manifest row {cell_id!r} has {len(audio_paths)}"
-                )
         else:
             audio_paths = []
+        clip_count = len(audio_paths)
+        if (
+            self.model_spec is not None
+            and self.model_spec.max_audio_clips is not None
+            and clip_count > self.model_spec.max_audio_clips
+        ):
+            raise UnderstandingProviderError(
+                f"{self.model} supports at most {self.model_spec.max_audio_clips} audio "
+                f"clip(s) per request; manifest row {cell_id!r} has {clip_count}"
+            )
         system_prompt = _system_prompt_with_setup(manifest_row)
         user_prompt = (
             transcript if transcript is not None else _vllm_user_text(manifest_row, audio_paths)
@@ -244,7 +246,8 @@ class LocalUnderstandingProvider:
             cell_id, manifest_row, audio_paths, transcript=transcript
         )
         completion_time_s = round(time.perf_counter() - started, 3)
-        self.call_count += 1
+        with PROVIDER_LOCK:
+            self.call_count += 1
         self._record_usage(response)
         if self.raw_response_output is not None:
             append_raw_response(
@@ -310,7 +313,11 @@ class LocalUnderstandingProvider:
         raise UnderstandingProviderError(f"{self.provider_name} request failed for {cell_id}")
 
     def _chat_request(
-        self, row: dict[str, Any], audio_paths: list[Path], *, transcript: str | None = None
+        self,
+        row: dict[str, Any],
+        audio_paths: list[Path],
+        *,
+        transcript: str | None = None,
     ) -> dict[str, Any]:
         system_prompt = _system_prompt_with_setup(row)
         system_prompt_mode = (
@@ -318,7 +325,7 @@ class LocalUnderstandingProvider:
         )
         if transcript is not None:
             # Transcript control: the whole labeled dialogue replaces the
-            # interleaved audio history as one text-only user turn.
+            # interleaved audio history as one text user turn.
             history = [{"role": "user", "content": [{"type": "text", "text": transcript}]}]
             if system_prompt_mode == "first_user":
                 history[0]["content"].insert(0, {"type": "text", "text": system_prompt})
@@ -358,6 +365,11 @@ class LocalUnderstandingProvider:
         return request
 
     def _client(self) -> Any:
+        # cases run on threads (case_pool): a second client would close the first when it is collected
+        with PROVIDER_LOCK:
+            return self._make_client()
+
+    def _make_client(self) -> Any:
         if self.client is not None:
             return self.client
         self.client = _openai_client(
@@ -375,9 +387,10 @@ class LocalUnderstandingProvider:
         input_tokens = _usage_value(usage, "input_tokens")
         output_tokens = _usage_value(usage, "output_tokens")
         total_tokens = _usage_value(usage, "total_tokens") or input_tokens + output_tokens
-        self.usage["input_tokens"] += input_tokens
-        self.usage["output_tokens"] += output_tokens
-        self.usage["total_tokens"] += total_tokens
+        with PROVIDER_LOCK:
+            self.usage["input_tokens"] += input_tokens
+            self.usage["output_tokens"] += output_tokens
+            self.usage["total_tokens"] += total_tokens
 
 
 def _predict_with_resume(
@@ -386,33 +399,28 @@ def _predict_with_resume(
     manifest_path: Path,
     output: Path,
 ) -> list[PredictionRow]:
-    existing = _existing_predictions(output)
-    predictions: list[PredictionRow] = []
-    output.parent.mkdir(parents=True, exist_ok=True)
-    with output.open("a", encoding="utf-8") as handle:
-        for index, row in enumerate(rows, start=1):
-            cell_id = _required_str(row, "cell_id")
-            print_eval_case_progress(
-                provider.provider_name, provider.model, cell_id, index, len(rows)
-            )
-            if cell_id in existing:
-                predictions.append(existing[cell_id])
-                continue
-            try:
-                prediction = provider.predict(row, manifest_path=manifest_path)
-            except PredictionFormatError as exc:
-                prediction = _error_prediction(row, provider, exc)
-            except UnderstandingProviderError as exc:
-                # A server that keeps rejecting THIS input (4xx after retries) is a
-                # per-cell defect, not an outage: degrade the row and keep the sweep
-                # alive. Transport/5xx failures still abort the run.
-                if not _client_rejected_input(exc):
-                    raise
-                prediction = _error_prediction(row, provider, exc)
-            handle.write(f"{canonical_json(prediction)}\n")
-            handle.flush()
-            predictions.append(prediction)
-    return predictions
+    def one(row: dict[str, Any]) -> PredictionRow:
+        try:
+            return provider.predict(row, manifest_path=manifest_path)
+        except PredictionFormatError as exc:
+            return _error_prediction(row, provider, exc)
+        except UnderstandingProviderError as exc:
+            # A server that keeps rejecting THIS input (4xx after retries) is a
+            # per-cell defect, not an outage: degrade the row and keep the sweep
+            # alive. Transport/5xx failures still abort the run.
+            if not _client_rejected_input(exc):
+                raise
+            return _error_prediction(row, provider, exc)
+
+    return predict_rows(
+        rows,
+        _existing_predictions(output),
+        one,
+        output=output,
+        progress=lambda cell_id, done, total: print_eval_case_progress(
+            provider.provider_name, provider.model, cell_id, done, total
+        ),
+    )
 
 
 _CLIENT_REJECT_MARKERS = ("Error code: 400", "Error code: 422", "BadRequestError")
@@ -462,11 +470,15 @@ def _vllm_history_messages(
     inline_system: str | None = None,
 ) -> list[dict[str, Any]]:
     messages: list[dict[str, Any]] = []
+    note = final_turn_note(row)
     for message in history_messages(row, audio_paths):
         if message.role == "user":
             if message.audio_path is None:
                 raise UnderstandingProviderError("user audio history message missing audio_path")
-            messages.append({"role": "user", "content": [_audio_url_part(message.audio_path)]})
+            content: list[dict[str, Any]] = [_audio_url_part(message.audio_path)]
+            if note and message.final_user_turn:
+                content.append({"type": "text", "text": note})
+            messages.append({"role": "user", "content": content})
         elif message.assistant_text is not None:
             messages.append({"role": "assistant", "content": message.assistant_text})
     if inline_system is not None:

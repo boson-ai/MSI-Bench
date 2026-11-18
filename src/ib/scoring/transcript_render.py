@@ -23,7 +23,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from ib.audio.acoustic_markup import clean_spoken_text
+from ib.text.acoustic_markup import clean_spoken_text
 
 
 def render_visible_transcript(row: dict[str, Any]) -> str:

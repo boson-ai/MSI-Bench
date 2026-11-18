@@ -4,7 +4,8 @@ Calling spec:
     spec: ToolValidationSpec
     result = ToolValidationResult(...)
 
-Specs declare required calls, argument match operators, and forbidden tool names.
+Specs declare required calls, argument match operators, forbidden tool names, and
+(for no_calls / exact_multiset) read-only tool names whose surplus calls are ignored.
 Results contain only deterministic validation diagnostics. Side effects: none.
 """
 
@@ -17,7 +18,7 @@ from pydantic import Field, model_validator
 from ib.models.base import IbBaseModel
 
 
-TOOL_VALIDATOR_POLICY_VERSION = "ib.tool_validation.v2"
+TOOL_VALIDATOR_POLICY_VERSION = "ib.tool_validation.v3"
 ToolCallPolicy = Literal["no_calls", "exact_multiset", "required_subset"]
 ToolValidationSource = Literal["explicit", "legacy"]
 
@@ -104,6 +105,14 @@ class NoCallsValidation(IbBaseModel):
     """Reject every predicted tool call."""
 
     call_policy: Literal["no_calls"] = "no_calls"
+    read_only_call_names: list[str] = Field(
+        default_factory=list, exclude_if=lambda value: not value
+    )
+
+    @model_validator(mode="after")
+    def _validate_read_only_names(self) -> "NoCallsValidation":
+        _validate_read_only_call_names(self.read_only_call_names, [])
+        return self
 
 
 class ExactMultisetValidation(IbBaseModel):
@@ -112,10 +121,14 @@ class ExactMultisetValidation(IbBaseModel):
     call_policy: Literal["exact_multiset"] = "exact_multiset"
     required_calls: list[RequiredToolCall] = Field(min_length=1)
     forbidden_call_names: list[str] = Field(default_factory=list)
+    read_only_call_names: list[str] = Field(
+        default_factory=list, exclude_if=lambda value: not value
+    )
 
     @model_validator(mode="after")
     def _validate_forbidden_names(self) -> "ExactMultisetValidation":
         _validate_forbidden_call_names(self.required_calls, self.forbidden_call_names)
+        _validate_read_only_call_names(self.read_only_call_names, self.forbidden_call_names)
         return self
 
 
@@ -162,6 +175,7 @@ class ToolValidationResult(IbBaseModel):
     unmatched_predicted_indices: list[int] = Field(default_factory=list)
     forbidden_predicted_indices: list[int] = Field(default_factory=list)
     invalid_predicted_indices: list[int] = Field(default_factory=list)
+    ignored_predicted_indices: list[int] = Field(default_factory=list)
 
     def rationale(self) -> str:
         """Return a stable, compact explanation suitable for score reports."""
@@ -176,6 +190,10 @@ class ToolValidationResult(IbBaseModel):
             f"{len(self.forbidden_predicted_indices)} forbidden call(s)",
             f"{len(self.invalid_predicted_indices)} invalid call(s)",
         ]
+        if self.ignored_predicted_indices:
+            details.append(
+                f"{len(self.ignored_predicted_indices)} ignored read-only call(s)"
+            )
         return f"{summary}; " + "; ".join(details)
 
 
@@ -189,6 +207,18 @@ def _validate_forbidden_call_names(
     overlap = sorted({call.name for call in required_calls} & set(forbidden_call_names))
     if overlap:
         raise ValueError(f"required tool names cannot also be forbidden: {overlap}")
+
+
+def _validate_read_only_call_names(
+    read_only_call_names: list[str], forbidden_call_names: list[str]
+) -> None:
+    if any(not name.strip() for name in read_only_call_names):
+        raise ValueError("read-only tool names must not be blank")
+    if len(read_only_call_names) != len(set(read_only_call_names)):
+        raise ValueError("read-only tool names must be unique")
+    overlap = sorted(set(read_only_call_names) & set(forbidden_call_names))
+    if overlap:
+        raise ValueError(f"forbidden tool names cannot also be read-only: {overlap}")
 
 
 def _strict_schema_equal(left: Any, right: Any) -> bool:

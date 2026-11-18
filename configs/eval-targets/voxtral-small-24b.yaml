@@ -1,0 +1,4 @@
+base:
+  - name: voxtral-small-24b
+    provider: local
+    model: Voxtral-Small-24B-2507

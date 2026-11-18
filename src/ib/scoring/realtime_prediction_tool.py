@@ -14,7 +14,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from ib.predictions import PredictionAction
+from ib.scoring.predictions import PredictionAction
 
 EMIT_PREDICTION_TOOL_NAME = "emit_prediction"
 

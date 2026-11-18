@@ -1,0 +1,6 @@
+# Transcript-input (local_text) twin of qwen3-omni-30b: same server, same
+# prompt_json protocol; only the input modality changes.
+base:
+  - name: qwen3-omni-30b-text
+    provider: local_text
+    model: Qwen3-Omni-30B-A3B-Instruct

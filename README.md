@@ -185,63 +185,128 @@ call itself.
 
 ## Layout
 
-- `src/ib/` — the `ib` CLI: `eval`, `answer-judge`, `manifest-eval`,
-  `rubric-eval`, `validate-predictions`, `score-smoke`
-- `configs/` — eval target definitions (`--models`)
-- `serve/` — vLLM serving scripts + configs for open-weight audio models
-- `slurm/` — batch harness (`slurm/submit.sh <model-key> --suite <dir>`) and the
-  per-model target files used for the paper (`slurm/models.d/*.models.yaml`)
-- `tools/` — release-package adapter and paper-table aggregation
-- `tests/` — unit tests for the shipped components (`uv run pytest`)
+- `src/ib/`: the `ib` CLI. `ib eval` generates predictions, validates tool calls
+  (`manifest_eval.json`), runs the answer judge and writes one target directory per
+  model; `ib answer-judge` re-judges an existing `predictions.jsonl`.
+- `configs/`: eval target files for `ib eval --models`. `configs/eval-targets/<target>.yaml`
+  holds one file per published target (hosted and open-weight); `configs/eval-*.yaml` are
+  the v1 rosters.
+- `serve/`: vLLM settings for the open-weight models; see [serve/README.md](serve/README.md).
+- `tools/`:
+  - `build_suite_from_release.py`: v1 release package to an `ib eval` suite
+  - `build_suite_from_release_v2.py`: v2 release package to an `ib eval` suite
+  - `paper_table_rows.py`: folds `ib eval` outputs into the table columns (v1 and v2)
+  - `label_tool_side_effects.py`, `stamp_read_only_tools.py`,
+    `data/tool_side_effects_v2.jsonl`: how the v2 read-only tool names were labelled and
+    stamped (already stamped in the published v2 package; rerunning is optional)
+- `tests/`: unit tests for the shipped code (`uv run pytest`).
 
 ## Quick start
 
 ```bash
-uv sync                       # or: pip install -e .
+uv sync --extra gemini        # or: pip install -e ".[gemini]"
 cp .env.example .env          # fill in the provider keys you need
-python tools/build_suite_from_release.py --release <msi-bench-v1 dir> --output suite/ --probes
-ib eval --run suite/ --models configs/eval-models.yaml --output artifacts/eval/run1 \
-    --answer-judge --judge-provider openrouter --judge-model deepseek/deepseek-v4-pro
-python tools/paper_table_rows.py --suite suite/ --runs artifacts/eval/run1
 ```
 
-`build_suite_from_release.py` turns the release package (`data/…/case.json` +
-`index/cases.jsonl`, plus `probes/*.jsonl` with `--probes`) into a suite: one
-`<entry>/manifest/manifest.jsonl` per (language, pattern) with the referenced
-audio. `ib eval` writes one target directory per model with
-`predictions.jsonl`, `manifest_eval.json` (tool validation + probe summaries)
-and `answer_judge.json`; `paper_table_rows.py` folds those into the paper's
-columns.
+**v2** (download `v2/` of the Hugging Face dataset):
 
-## Reproducing the paper setting
+```bash
+python tools/build_suite_from_release_v2.py --release <msi-bench-v2 dir> --output suite-v2/
+ib eval --run suite-v2/ --models configs/eval-targets/gpt-audio-mini.yaml --output artifacts/eval/v2 \
+    --answer-judge --judge-provider openrouter --judge-model openai/gpt-6-luna
+python tools/paper_table_rows.py --suite suite-v2/ --runs artifacts/eval/v2
+```
 
+**v1** (download the v1 package):
+
+```bash
+python tools/build_suite_from_release.py --release <msi-bench-v1 dir> --output suite-v1/ --probes
+ib eval --run suite-v1/ --models configs/eval-models.yaml --output artifacts/eval/v1 \
+    --answer-judge --judge-provider openrouter --judge-model deepseek/deepseek-v4-pro
+python tools/paper_table_rows.py --suite suite-v1/ --runs artifacts/eval/v1
+```
+
+Each adapter writes one `<entry>/manifest/manifest.jsonl` (plus `plans/rubrics.jsonl`)
+per (language, pattern); audio paths point into the release package. `ib eval` writes
+`generated/<mode>/.../<model>[/<variant>]/` with `predictions.jsonl`,
+`manifest_eval.json` and `answer_judge.json`. Add `--limit N` to try a few cases first.
+
+## Setup prompts: v1 and v2
+
+v1 and v2 send the evaluated model different setup (system) prompts, each the one its
+published numbers were produced with. Every suite row carries `prompt_version`, written
+by the adapter: `"v1"` from `build_suite_from_release.py`, `"v2"` from
+`build_suite_from_release_v2.py`. `ib eval` picks the prompt from that field; any other
+value is an error. A v1 suite built before the field existed is still read as v1 (its
+case ids are recognised).
+
+- **v1 prompt:** an authorization-policy block, the scene's assistant role, and for
+  prompt-JSON targets a compact function list (`name arguments: field: type`).
+- **v2 prompt:** the assistant's name, how voice labels `<|S1|>`, `<|S2|>`, ... number the
+  voices, and for prompt-JSON targets the case's Anthropic tool definitions.
+
+The GPT Realtime output cap also follows the version: 700 tokens for reasoning effort
+medium in v1, 4096 in v2 (4096 for xhigh in both).
+
+## Reproducing v2
+
+- **Suite:** `tools/build_suite_from_release_v2.py`, base rows only. v2 has no hear-time
+  or speak-time probes, so leave out `--probes`, `--case-modes`, `--live-probe` and
+  `--speak-probe-approx`.
+- **Judge:** `--answer-judge --judge-provider openrouter --judge-model openai/gpt-6-luna`
+  (`OPENROUTER_API_KEY`).
+- **Hosted models:** native tool calling. `configs/eval-targets/gpt-audio-mini.yaml`
+  (OpenAI Chat Completions) and `configs/eval-targets/gemini-3.8-flash.yaml` (the API's
+  default thinking) send each case's tools as provider function declarations.
+  `configs/eval-targets/gpt-realtime-2.1-medium.yaml` runs the Realtime API with reasoning
+  effort medium; the decision comes back through an `emit_prediction` function call.
+- **Open-weight models:** served with vLLM ([serve/README.md](serve/README.md)) and
+  evaluated through the `local` provider with schema-constrained decoding:
+  `export IB_LOCAL_GUIDED_JSON=1` before `ib eval`. One target file per table row:
+  `qwen3-omni-instruct`, `qwen2.5-omni`, `qwen2-audio`, `phi4-multimodal`, `gemma4-12b`
+  (both Gemma 4 rows), `mimo-audio` (thinking) and `mimo-audio-plain`.
+- **History:** one audio message per room block, earlier assistant replies as text, from
+  the case's `audio_history`.
+- **Tool calls:** a call to a tool in the case's
+  `eval.tool_validation.read_only_call_names` is ignored when the gold does not require
+  it, by the deterministic validator and by the judge. Every other call must match the
+  gold exactly.
+- **Table:** `tools/paper_table_rows.py --suite <suite> --runs <eval dir>` prints APR
+  (95% Wilson half-width), ARS, Tool, format errors and per-pattern APR. BIR and PRR
+  print `--` for v2.
+
+## Reproducing v1 (the paper setting)
+
+- **Suite:** `tools/build_suite_from_release.py --probes`.
 - **Judge:** DeepSeek V4 Pro through OpenRouter, JSON mode, provider default
   temperature (`--answer-judge --judge-provider openrouter --judge-model
   deepseek/deepseek-v4-pro`, `OPENROUTER_API_KEY` in `.env`).
-- **Open-weight models:** served with vLLM (`serve/serve_model.sh`, configs
-  under `serve/configs/`), evaluated through the `local` provider with
-  schema-constrained decoding: `export IB_LOCAL_GUIDED_JSON=1` before
-  `ib eval`. Thinking variants (Gemma 4, MiMo-Audio) are declared in the
-  matching `slurm/models.d/*.models.yaml`.
+- **Open-weight models:** served with vLLM ([serve/README.md](serve/README.md)),
+  evaluated through the `local` provider with schema-constrained decoding:
+  `export IB_LOCAL_GUIDED_JSON=1` before `ib eval`. Thinking variants (Gemma 4,
+  MiMo-Audio) are declared in the matching `configs/eval-targets/*.yaml`.
 - **Hosted models:** `openai` (GPT Audio), `openai_realtime` (GPT Realtime),
-  `gemini` providers; see `configs/eval-models.yaml` and `slurm/models.d/`.
-- **Probes:** build the suite with `--probes`. Hear-time probes (PRR) run on
-  every target (`--case-modes base,hear`). Speak-time probes (BIR) run natively
-  on full-duplex targets with `--live-probe`, and on turn-based targets through
-  the barge-in approximation `--speak-probe-approx`.
-- **Metrics:** `tools/paper_table_rows.py` prints APR (with 95% Wilson
-  half-width), ARS, Tool, BIR, PRR and per-pattern APR per target, with the
-  paper's policies (format errors fail every atom; PRR excludes format-error
-  rows; Tool over cases requiring a call).
+  `gemini` providers; see `configs/eval-models.yaml` and `configs/eval-targets/`.
+- **Probes:** hear-time probes (PRR) run on every target (`--case-modes base,hear`).
+  Speak-time probes (BIR) run natively on full-duplex targets with `--live-probe`, and on
+  turn-based targets through the barge-in approximation `--speak-probe-approx`.
+- **Metrics:** `tools/paper_table_rows.py` prints APR (with 95% Wilson half-width), ARS,
+  Tool, BIR, PRR and per-pattern APR per target, with the paper's policies (format errors
+  fail every atom; PRR excludes format-error rows; Tool over cases requiring a call).
 
 ## Output format expected from a model
 
-One JSON object per case:
+Prompt-JSON targets (open-weight models, and GPT Realtime through its `emit_prediction`
+function) return one JSON object per case:
 
 ```json
 {"predicted_action": "respond" | "silent", "answer_text": "...",
  "tool_calls": [{"name": "...", "arguments": {...}}]}
 ```
+
+Native-tool targets (GPT Audio, Gemini) return their tool calls through the provider's
+function calling, and the respond/silent decision with the answer text as the JSON object
+above (with `tool_calls` empty) in the text channel.
 
 ## License
 

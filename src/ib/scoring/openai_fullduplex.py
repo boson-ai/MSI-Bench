@@ -23,12 +23,12 @@ import time
 from pathlib import Path
 from typing import Any
 
-from ib.eval_targets import RealtimeReasoningEffort
+from ib.scoring.eval_targets import RealtimeReasoningEffort
 from ib.scoring.probe_sampling import inject_offset_s_for_row
-from ib.io import canonical_json, write_jsonl
+from ib.io import write_jsonl
 from ib.llm import render_prompt
 from ib.models.raw_response import RawResponsePhase
-from ib.predictions import PredictionRow, read_predictions
+from ib.scoring.predictions import PredictionRow, read_predictions
 from ib.scoring.openai_understanding import (
     UnderstandingProviderError,
     _audio_paths_for,
@@ -50,10 +50,12 @@ from ib.scoring.openai_realtime_error_io import (
     write_prediction_format_failure,
 )
 from ib.scoring.multiturn_audio import history_messages, setup_prompt_for
+from ib.scoring.prompt_version import PromptVersion, prompt_version_for
 from ib.scoring.native_tool_schema import (
     build_native_tool_bundle,
     openai_realtime_tools,
 )
+from ib.scoring.case_pool import PROVIDER_LOCK, predict_rows
 from ib.scoring.progress import print_eval_case_progress
 from ib.scoring.raw_response_io import (
     append_raw_response,
@@ -71,14 +73,23 @@ from ib.scoring.smoke import _read_rows
 OPENAI_FULLDUPLEX_PROVIDER = "openai_realtime"
 DEFAULT_REALTIME_VOICE = "alloy"
 DEFAULT_REALTIME_MAX_OUTPUT_TOKENS = 700
-XHIGH_REALTIME_MAX_OUTPUT_TOKENS = 4_096
+REASONING_REALTIME_MAX_OUTPUT_TOKENS = 4_096
+# medium and up spend reasoning tokens from the same cap: at 700 a multi-tool answer is cut off
+# (incomplete). The v1 paper ran with only xhigh roomy, so v1 rows keep that.
+_ROOMY_EFFORTS_BY_VERSION: dict[PromptVersion | None, frozenset[str]] = {
+    "v1": frozenset({"xhigh"}),
+    "v2": frozenset({"medium", "high", "xhigh"}),
+    None: frozenset({"medium", "high", "xhigh"}),
+}
 _REALTIME_PCM16 = {"type": "audio/pcm", "rate": DEFAULT_REALTIME_SAMPLE_RATE}
 
 
-def _max_output_tokens(reasoning_effort: RealtimeReasoningEffort | None) -> int:
-    """Give xhigh reasoning enough room without changing existing targets."""
-    if reasoning_effort == "xhigh":
-        return XHIGH_REALTIME_MAX_OUTPUT_TOKENS
+def _max_output_tokens(
+    reasoning_effort: RealtimeReasoningEffort | None, prompt_version: PromptVersion | None = None
+) -> int:
+    """Give roomy reasoning efforts 4096 output tokens; every other target keeps 700."""
+    if reasoning_effort in _ROOMY_EFFORTS_BY_VERSION[prompt_version]:
+        return REASONING_REALTIME_MAX_OUTPUT_TOKENS
     return DEFAULT_REALTIME_MAX_OUTPUT_TOKENS
 
 
@@ -203,11 +214,14 @@ class OpenAiFullDuplexProvider:
                     "instructions": instructions,
                     "tools": [emit_tool],
                     "tool_choice": emit_prediction_tool_choice(),
-                    "max_output_tokens": _max_output_tokens(self.reasoning_effort),
+                    "max_output_tokens": _max_output_tokens(
+                        self.reasoning_effort, prompt_version_for(manifest_row)
+                    ),
                 }
             )
             capture = _collect_response(connection, timeout_s=self.recv_timeout_s)
-        self.call_count += 1
+        with PROVIDER_LOCK:
+            self.call_count += 1
         self._record_usage(capture)
         return capture
 
@@ -263,8 +277,9 @@ class OpenAiFullDuplexProvider:
                 injection_audio_base64=[_wav_as_pcm16_base64(path) for path in live_paths],
                 tool_name_map=tool_name_map,
             )
-        self.call_count += 1
-        self.live_probe_count += 1
+        with PROVIDER_LOCK:
+            self.call_count += 1
+            self.live_probe_count += 1
         self._record_usage(capture)
         self._record_raw_capture(cell_id, "live_probe", capture)
         live_tool_calls = capture.tool_calls
@@ -321,6 +336,11 @@ class OpenAiFullDuplexProvider:
         )
 
     def _client(self) -> Any:
+        # cases run on threads (case_pool): a second client would close the first when it is collected
+        with PROVIDER_LOCK:
+            return self._make_client()
+
+    def _make_client(self) -> Any:
         if self.client is not None:
             return self.client
         api_key = self.api_key or os.getenv("OPENAI_API_KEY")
@@ -336,8 +356,9 @@ class OpenAiFullDuplexProvider:
         return self.client
 
     def _record_usage(self, capture: "RealtimeCapture") -> None:
-        for key in self.usage:
-            self.usage[key] += int(capture.usage.get(key, 0) or 0)
+        with PROVIDER_LOCK:
+            for key in self.usage:
+                self.usage[key] += int(capture.usage.get(key, 0) or 0)
 
     def _record_raw_capture(
         self,
@@ -622,26 +643,21 @@ def _predict_with_resume(
     manifest_path: Path,
     output: Path,
 ) -> list[PredictionRow]:
-    existing = _existing_predictions(output)
-    predictions: list[PredictionRow] = []
-    output.parent.mkdir(parents=True, exist_ok=True)
-    with output.open("a", encoding="utf-8") as handle:
-        for index, row in enumerate(rows, start=1):
-            cell_id = _required_str(row, "cell_id")
-            print_eval_case_progress(
-                OPENAI_FULLDUPLEX_PROVIDER, provider.model, cell_id, index, len(rows)
-            )
-            if cell_id in existing:
-                predictions.append(existing[cell_id])
-                continue
-            try:
-                prediction = provider.predict(row, manifest_path=manifest_path)
-            except RealtimePredictionFormatError as exc:
-                prediction = _error_prediction(row, provider, exc)
-            handle.write(f"{canonical_json(prediction)}\n")
-            handle.flush()
-            predictions.append(prediction)
-    return predictions
+    def one(row: dict[str, Any]) -> PredictionRow:
+        try:
+            return provider.predict(row, manifest_path=manifest_path)
+        except RealtimePredictionFormatError as exc:
+            return _error_prediction(row, provider, exc)
+
+    return predict_rows(
+        rows,
+        _existing_predictions(output),
+        one,
+        output=output,
+        progress=lambda cell_id, done, total: print_eval_case_progress(
+            OPENAI_FULLDUPLEX_PROVIDER, provider.model, cell_id, done, total
+        ),
+    )
 
 
 def _existing_predictions(output: Path) -> dict[str, PredictionRow]:
@@ -699,13 +715,11 @@ def _live_system_prompt(row: dict[str, Any]) -> str:
 
 
 def _live_user_prompt(row: dict[str, Any], audio_paths: list[Path]) -> str:
-    functions = row.get("logic_available_functions")
     return render_prompt(
         "understanding/user.j2",
         {
             "kind": "live",
             "audio_count": len(audio_paths),
-            "available_functions": json.dumps(functions or [], ensure_ascii=False),
         },
     )
 

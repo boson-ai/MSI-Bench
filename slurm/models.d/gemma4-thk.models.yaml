@@ -1,7 +1,0 @@
-# gemma-4-12B thinking-enabled only (self-prefill single-variant run).
-base:
-  - name: gemma-4-12b-instruct-thinking
-    provider: local
-    model: gemma-4-12B-it
-    checkpoint_path: <models-root>/gemma-4-12B-it
-    thinking_mode: enabled

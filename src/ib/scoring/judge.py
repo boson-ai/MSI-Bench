@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol
 
-from ib.audio.acoustic_markup import clean_spoken_text
+from ib.text.acoustic_markup import clean_spoken_text
 from ib.llm import LlmProviderError, LlmRequest, complete_json, render_prompt
 from ib.llm.openrouter import (
     OPENROUTER_BASE_URL,
@@ -23,10 +23,11 @@ from ib.llm.qwen import (
     QWEN35_THINKING_PROVIDER,
     qwen_request_options,
 )
-from ib.predictions import read_predictions
+from ib.scoring.predictions import read_predictions
 from ib.scoring.progress import print_eval_case_progress
 from ib.scoring.smoke import _read_rows, _rubric_references
-from ib.tool_call_rubric import TOOL_CALL_ARGS_DIMENSION
+from ib.scoring.tool_validation import effective_tool_calls
+from ib.models.tool_call_rubric import TOOL_CALL_ARGS_DIMENSION
 
 if TYPE_CHECKING:
     from ib.llm import LlmService
@@ -203,84 +204,6 @@ def _response_format_for(provider_name: str) -> dict[str, str] | None:
     return {"type": "json_object"}
 
 
-def judge_answers(
-    manifest_path: str | Path,
-    predictions_path: str | Path,
-    rubrics_path: str | Path,
-    *,
-    provider: str | JudgeProvider = DEFAULT_LLM_PROVIDER,
-    model: str | None = None,
-) -> dict:
-    """Judge answerable manifest rows using supplied predictions and planner rubrics."""
-    manifest = _read_rows(manifest_path)
-    predictions = {
-        row.cell_id: row.model_dump(mode="json") for row in read_predictions(predictions_path)
-    }
-    rubrics = {row["rubric_id"]: row for row in _read_rows(rubrics_path)}
-    if isinstance(provider, str):
-        resolved = (
-            provider_for(provider, model=model) if model is not None else provider_for(provider)
-        )
-    else:
-        resolved = provider
-    judgments = []
-    errors = []
-    for row in manifest:
-        cell_id = row.get("cell_id")
-        if not isinstance(cell_id, str):
-            errors.append("manifest row has invalid cell_id")
-            continue
-        refs = sorted(set(_rubric_references(row)))
-        if not refs:
-            continue
-        prediction = predictions.get(cell_id)
-        if prediction is None:
-            errors.append(f"missing prediction for answerable row {cell_id}")
-            continue
-        for rubric_id in refs:
-            rubric = rubrics.get(rubric_id)
-            if rubric is None:
-                errors.append(f"missing rubric {rubric_id}")
-                continue
-            if _prediction_has_format_error(prediction):
-                payload = _failed_judgment_payload(rubric, _FORMAT_ERROR_RATIONALE)
-            else:
-                payload = resolved.judge(
-                    manifest_row=row,
-                    prediction=prediction,
-                    rubric=rubric,
-                )
-            judgment = _validate_judgment(
-                payload,
-                rubric,
-                prediction=prediction,
-            )
-            judgments.append(
-                {
-                    "cell_id": cell_id,
-                    "rubric_id": rubric_id,
-                    "provider": resolved.name,
-                    **judgment,
-                }
-            )
-    passed = sum(1 for item in judgments if item["passed"])
-    atomic_count = sum(item["atomic_count"] for item in judgments)
-    atomic_passed_count = sum(item["atomic_passed_count"] for item in judgments)
-    return {
-        "schema_version": "ib.answer_judge.v1",
-        "policy_version": ANSWER_JUDGE_POLICY_VERSION,
-        "provider": resolved.name,
-        "judgment_count": len(judgments),
-        "passed_count": passed,
-        "pass_rate": passed / len(judgments) if judgments else 1.0,
-        "atomic_count": atomic_count,
-        "atomic_passed_count": atomic_passed_count,
-        "atomic_pass_rate": atomic_passed_count / atomic_count if atomic_count else 1.0,
-        "judgments": judgments,
-        "errors": errors,
-    }
-
-
 async def ajudge_answers(
     manifest_path: str | Path,
     predictions_path: str | Path,
@@ -293,7 +216,7 @@ async def ajudge_answers(
     progress_model: str | None = None,
     max_concurrency: int = _DEFAULT_ASYNC_JUDGE_CONCURRENCY,
 ) -> dict:
-    """Async sibling of ``judge_answers`` — judges every (row, rubric) pair with bounded concurrency."""
+    """Judge every (row, rubric) pair with bounded concurrency."""
     manifest = _read_rows(manifest_path)
     predictions = {
         row.cell_id: row.model_dump(mode="json") for row in read_predictions(predictions_path)
@@ -580,7 +503,9 @@ def _user_prompt(manifest_row: dict, prediction: dict, rubric: dict) -> str:
                 _judge_manifest_view(manifest_row), sort_keys=True, ensure_ascii=False
             ),
             "prediction_json": json.dumps(
-                _judge_prediction_view(prediction), sort_keys=True, ensure_ascii=False
+                _judge_prediction_view(prediction, manifest_row),
+                sort_keys=True,
+                ensure_ascii=False,
             ),
             "rubric_json": json.dumps(
                 _judge_rubric_view(rubric), sort_keys=True, ensure_ascii=False
@@ -676,6 +601,13 @@ def _judge_rubric_view(rubric: dict) -> dict:
     return view
 
 
-def _judge_prediction_view(prediction: dict) -> dict:
-    """Return only model-emitted fields the answer judge may score."""
-    return {key: prediction[key] for key in JUDGE_PREDICTION_FIELDS if key in prediction}
+def _judge_prediction_view(prediction: dict, manifest_row: dict) -> dict:
+    """Return only model-emitted fields the answer judge may score.
+
+    Ignored read-only lookups are hidden so the judge does not read an exploratory
+    call as a committed action.
+    """
+    view = {key: prediction[key] for key in JUDGE_PREDICTION_FIELDS if key in prediction}
+    if isinstance(view.get("tool_calls"), list):
+        view["tool_calls"] = effective_tool_calls(manifest_row, view["tool_calls"])
+    return view

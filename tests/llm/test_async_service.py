@@ -1,4 +1,4 @@
-"""Async LLM service: rate limiting, retries, cost tracking, and concurrency."""
+"""Async LLM service: rate limiting, retries, usage tracking, and concurrency."""
 
 from __future__ import annotations
 
@@ -9,7 +9,6 @@ from types import SimpleNamespace
 import pytest
 
 from ib.llm import (
-    CostTracker,
     LlmConfig,
     LlmProviderError,
     LlmRequest,
@@ -18,9 +17,8 @@ from ib.llm import (
     RateLimiter,
     complete_json,
     parse_json_object,
-    price_lookup,
+    UsageTracker,
 )
-from ib.llm.cost import PRICING_TABLE
 from ib.llm.qwen import (
     QWEN35_BASE_URL,
     QWEN35_MAX_OUTPUT_TOKENS,
@@ -32,12 +30,7 @@ from ib.llm.service import LlmRateLimitError, LlmTransientError
 
 
 def _fake_client(create) -> SimpleNamespace:
-    """Wrap an async ``create`` coroutine into an openai-shaped client double."""
-    return SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=create)))
-
-
-def _sync_fake_client(create) -> SimpleNamespace:
-    """Wrap a sync ``create`` function into an openai-shaped client double."""
+    """Wrap a sync or async ``create`` into an openai-shaped client double."""
     return SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=create)))
 
 
@@ -105,11 +98,11 @@ async def _gather(worker, n) -> None:
     await asyncio.gather(*(worker() for _ in range(n)))
 
 
-# --- CostTracker -----------------------------------------------------------
+# --- UsageTracker ----------------------------------------------------------
 
 
-def test_cost_tracker_aggregates_by_module_and_model() -> None:
-    tracker = CostTracker(budget_usd=None, default_cost_per_1m=10.0)
+def test_usage_tracker_aggregates_by_module_and_model() -> None:
+    tracker = UsageTracker()
 
     async def run() -> dict:
         await tracker.record(LlmUsage("gpt-4.1-mini", "planner.director", 1_000_000, 0))
@@ -117,48 +110,22 @@ def test_cost_tracker_aggregates_by_module_and_model() -> None:
         return tracker.summary()
 
     summary = asyncio.run(run())
-    # gpt-4.1-mini: input 0.4/1M, output 1.6/1M
-    assert summary["total_cost_usd"] == pytest.approx(0.4 + 1.6)
     assert summary["total_input_tokens"] == 1_000_000
     assert summary["total_output_tokens"] == 1_000_000
     assert summary["call_count"] == 2
     assert summary["calls_by_module"] == {"planner.actor": 1, "planner.director": 1}
     assert summary["calls_by_model"] == {"gpt-4.1-mini": 2}
-    assert summary["by_module"]["planner.director"] == pytest.approx(0.4)
-    assert summary["by_module"]["planner.actor"] == pytest.approx(1.6)
-    assert summary["by_model"]["gpt-4.1-mini"] == pytest.approx(2.0)
+    assert not any("cost" in key for key in summary)
 
 
-def test_pricing_fallback_for_unknown_model_is_silent(caplog) -> None:
-    assert price_lookup("gpt-4.1-mini", 99.0) == PRICING_TABLE["gpt-4.1-mini"]
-    with caplog.at_level("WARNING", logger="ib.llm.cost"):
-        fallback = price_lookup("totally-unknown", 7.5)
-    assert fallback == {"input_per_1m": 7.5, "output_per_1m": 7.5}
-    assert not caplog.records
-
-
-def test_budget_warns_once(caplog) -> None:
-    tracker = CostTracker(budget_usd=1.0, warn_at_percent=80.0, default_cost_per_1m=1_000_000.0)
-
-    async def run() -> None:
-        # default cost is $1/token here; one token at input rate = $1.0 -> over 80%.
-        with caplog.at_level("WARNING", logger="ib.llm.cost"):
-            await tracker.record(LlmUsage("unpriced", "m", 1, 0))
-            await tracker.record(LlmUsage("unpriced", "m", 1, 0))
-
-    asyncio.run(run())
-    budget_warnings = [r for r in caplog.records if "budget warning" in r.getMessage().lower()]
-    assert len(budget_warnings) == 1  # warns once, never again, never raises
-
-
-def test_cost_write(tmp_path) -> None:
-    tracker = CostTracker(budget_usd=None)
+def test_usage_write(tmp_path) -> None:
+    tracker = UsageTracker()
 
     async def run() -> None:
         await tracker.record(LlmUsage("gpt-4.1-mini", "x", 100, 50))
 
     asyncio.run(run())
-    out = tmp_path / "cost.json"
+    out = tmp_path / "usage.json"
     written = tracker.write(out)
     on_disk = json.loads(out.read_text())
     assert on_disk == written
@@ -166,14 +133,6 @@ def test_cost_write(tmp_path) -> None:
 
 
 # --- retry -----------------------------------------------------------------
-
-
-def test_llm_config_defaults_to_100_second_request_timeout() -> None:
-    assert LlmConfig().request_timeout_s == 100.0
-
-
-def test_llm_config_defaults_to_two_second_retry_base_delay() -> None:
-    assert LlmConfig().retry_base_delay_s == 2.0
 
 
 def test_retry_recovers_after_transient_failures() -> None:
@@ -215,7 +174,7 @@ def test_retry_exhausts_and_raises_last_transient() -> None:
 # --- LlmService ------------------------------------------------------------
 
 
-def test_acomplete_captures_tokens_and_records_cost() -> None:
+def test_acomplete_captures_tokens_and_records_usage() -> None:
     async def create(**kwargs):
         assert kwargs["model"] == "gpt-4.1-mini"
         return _response(json.dumps({"ok": True}), prompt_tokens=120, completion_tokens=30)
@@ -224,7 +183,7 @@ def test_acomplete_captures_tokens_and_records_cost() -> None:
         svc = LlmService(LlmConfig())
         payload = await svc.acomplete_json(_req(_fake_client(create)), module="planner.director")
         await svc.aclose()
-        return {"payload": payload, "summary": svc.cost.summary()}
+        return {"payload": payload, "summary": svc.usage.summary()}
 
     out = asyncio.run(run())
     assert out["payload"] == {"ok": True}
@@ -232,7 +191,7 @@ def test_acomplete_captures_tokens_and_records_cost() -> None:
     assert s["call_count"] == 1
     assert s["total_input_tokens"] == 120
     assert s["total_output_tokens"] == 30
-    assert s["by_module"]["planner.director"] > 0
+    assert s["calls_by_module"] == {"planner.director": 1}
 
 
 def test_acomplete_routes_gemini_to_interactions_client() -> None:
@@ -258,7 +217,7 @@ def test_acomplete_routes_gemini_to_interactions_client() -> None:
         )
         payload = await svc.acomplete_json(request, module="planner.logic_director")
         await svc.aclose()
-        return {"payload": payload, "summary": svc.cost.summary()}
+        return {"payload": payload, "summary": svc.usage.summary()}
 
     out = asyncio.run(run())
 
@@ -284,7 +243,7 @@ def test_qwen_request_forwards_base_model_and_thinking_options() -> None:
         max_tokens=QWEN35_MAX_OUTPUT_TOKENS,
         base_url=QWEN35_BASE_URL,
         extra_body=qwen_request_options(enable_thinking=False),
-        client=_sync_fake_client(create),
+        client=_fake_client(create),
     )
 
     assert complete_json(request) == {"ok": True}
@@ -343,11 +302,11 @@ def test_acomplete_retries_then_succeeds_and_counts_one_call() -> None:
         svc = LlmService(LlmConfig(retry_base_delay_s=0.001, retry_max_delay_s=0.002))
         await svc.acomplete(_req(_fake_client(create)))
         await svc.aclose()
-        return svc.cost.summary()
+        return svc.usage.summary()
 
     summary = asyncio.run(run())
     assert state["n"] == 3  # retried twice
-    assert summary["call_count"] == 1  # cost recorded once, on success
+    assert summary["call_count"] == 1  # usage recorded once, on success
 
 
 def test_acomplete_json_rejects_non_json() -> None:
@@ -382,7 +341,7 @@ def test_service_throttles_global_concurrency_across_calls() -> None:
         client = _fake_client(create)
         await asyncio.gather(*(svc.acomplete(_req(client)) for _ in range(20)))
         await svc.aclose()
-        return svc.cost.summary()["call_count"]
+        return svc.usage.summary()["call_count"]
 
     count = asyncio.run(run())
     assert peak <= 4

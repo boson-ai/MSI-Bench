@@ -1,0 +1,4 @@
+base:
+  - name: qwen2-audio-7b
+    provider: local
+    model: Qwen2-Audio-7B-Instruct

@@ -18,7 +18,7 @@ Side effects: none (reads only).
 
 Scoring policy (identical to the paper tables):
   - APR: fraction of base cases whose scored judge atoms all pass and whose
-    deterministic tool-validator atom passes (``ib.eval_pattern_metrics.judge_by_cell``).
+    deterministic tool-validator atom passes (``ib.evaluation.judge_metrics.judge_by_cell``).
   - ARS: micro-average over all scored atoms of all base cases.
   - Tool: validator pass rate over base cases requiring at least one call.
   - A prediction with a provider/format error fails every atom.
@@ -41,14 +41,14 @@ from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
 from typing import Any
 
-from ib.eval_pattern_metrics import judge_by_cell
+from ib.evaluation.judge_metrics import judge_by_cell
 from ib.scoring.tool_validation import validate_manifest_tool_calls
 
 PATTERN_ORDER = ("auth", "disc", "prior", "seq", "scope", "retr")
 PATTERN_LABEL = {
     "auth": "Auth", "disc": "Discl", "prior": "Prior", "seq": "Seq", "scope": "Scope", "retr": "Retr",
 }
-CASE_ID_RE = re.compile(r"msi-\w+-(\w+)-")
+CASE_ID_RE = re.compile(r"msi2?-\w+-(\w+)-")  # v1 msi-<lang>-<pat>-..., v2 msi2-<lang>-<pat>-...
 PROBE_MODES = {"hear_time_probe", "speak_time_probe"}
 
 
@@ -71,7 +71,7 @@ def is_format_error(prediction: dict | None) -> bool:
 
 
 def tool_validations(rows: list[dict], predictions: dict[str, dict]) -> dict[str, Any]:
-    """Validate each base case once (ib.leaderboard.tool_records.tool_validations_by_cell)."""
+    """Validate each base case once with the deterministic tool validator."""
     out = {}
     for row in rows:
         cell_id = str(row.get("cell_id") or row.get("id") or "")
@@ -123,7 +123,10 @@ def collect(runs: list[Path], rubrics: dict[str, dict]) -> dict[str, dict[str, A
             target_dir = pred_path.parent
             target = targets[target_key(pred_path)]
             predictions = {r["cell_id"]: r for r in read_jsonl(pred_path)}
-            manifest = read_jsonl(target_dir / "manifest_case_modes.jsonl")
+            modes_path = target_dir / "manifest_case_modes.jsonl"
+            if not modes_path.exists():  # base-only runs write no case-modes file; the suite manifest is the row set
+                modes_path = Path(json.loads((target_dir / "summary.json").read_text(encoding="utf-8"))["manifest"])
+            manifest = read_jsonl(modes_path)
             base_rows = [m for m in manifest if m.get("logic_case_mode") not in PROBE_MODES]
             judge_path = target_dir / "answer_judge.json"
             judged: dict[str, dict] = {}

@@ -9,7 +9,8 @@ Inputs:  a release package (data/<lang>/<pattern>/<scene>/<case_id>/,
          probes/speak_probe.jsonl, probes/hear_probe.jsonl, probes/audio_live/).
 Outputs: <suite dir>/<entry>/manifest/manifest.jsonl + <entry>/plans/rubrics.jsonl,
          one entry per (language, pattern); audio paths are relative to the entry
-         and resolve into the release package. Default emits base rows only;
+         and resolve into the release package. Every row carries prompt_version "v1"
+         (the v1 paper's setup prompt, ib.scoring.prompt_version). Default emits base rows only;
          --probes additionally derives speak_time_probe rows (one per case) and
          hear_time_probe rows (the shipped subset) from the probe protocol files
          — no probe row references any audio outside the release package.
@@ -59,6 +60,7 @@ def manifest_row(case: dict, release: Path, entry_dir: Path) -> dict:
     ]
     return {
         "cell_id": case["case_id"],
+        "prompt_version": "v1",
         "logic_case_mode": "base_semantic",
         "language": case["language"],
         "scene": case["scene"],

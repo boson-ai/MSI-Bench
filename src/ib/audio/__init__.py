@@ -1,1 +1,1 @@
-"""audio — released subset: acoustic text markup + stdlib WAV helpers."""
+"""audio — released subset: stdlib PCM16 WAV helpers (ib.audio.wav_io, ib.audio.sample_array)."""

@@ -21,19 +21,22 @@ import time
 from pathlib import Path
 from typing import Any
 
-from ib.io import canonical_json, write_jsonl
+from ib.io import write_jsonl
 from ib.llm import LlmProviderError, parse_json_object, render_prompt
-from ib.predictions import PredictionAction, PredictionRow, read_predictions
+from ib.scoring.predictions import PredictionAction, PredictionRow, read_predictions
 from ib.scoring.multiturn_audio import (
     AudioHistoryMessage,
     history_messages,
+    final_turn_note,
     setup_prompt_for,
 )
 from ib.scoring.native_tool_schema import (
     NativeToolBundle,
     build_native_tool_bundle,
+    native_bundle_for_row,
     openai_chat_tools,
 )
+from ib.scoring.case_pool import PROVIDER_LOCK, predict_rows
 from ib.scoring.progress import print_eval_case_progress
 from ib.scoring.raw_response_io import append_raw_response, raw_response_path
 from ib.scoring.smoke import _read_rows
@@ -128,7 +131,7 @@ class OpenAiUnderstandingProvider:
             raise UnderstandingProviderError(f"manifest row {cell_id!r} has no audio paths")
         native_tools = self.tool_protocol == "native"
         native_bundle = (
-            build_native_tool_bundle(manifest_row.get("logic_available_functions"))
+            native_bundle_for_row(manifest_row)
             if native_tools
             else NativeToolBundle(declarations=[], name_map={})
         )
@@ -137,7 +140,7 @@ class OpenAiUnderstandingProvider:
         request = {
             "model": self.model,
             "messages": [{"role": "system", "content": system_prompt}]
-            + _openai_history_messages(manifest_row, audio_paths),
+            + _openai_history_messages(manifest_row, audio_paths, tool_protocol=self.tool_protocol),
             "max_completion_tokens": 700,
             "temperature": 0,
         }
@@ -147,7 +150,8 @@ class OpenAiUnderstandingProvider:
         started = time.perf_counter()
         response = self._create_completion(request)
         completion_time_s = round(time.perf_counter() - started, 3)
-        self.call_count += 1
+        with PROVIDER_LOCK:
+            self.call_count += 1
         self._record_usage(response)
         if self.raw_response_output is not None:
             append_raw_response(
@@ -190,6 +194,11 @@ class OpenAiUnderstandingProvider:
         )
 
     def _client(self) -> Any:
+        # cases run on threads (case_pool): a second client would close the first when it is collected
+        with PROVIDER_LOCK:
+            return self._make_client()
+
+    def _make_client(self) -> Any:
         if self.client is not None:
             return self.client
         api_key = self.api_key or os.getenv("OPENAI_API_KEY")
@@ -223,10 +232,10 @@ class OpenAiUnderstandingProvider:
         input_tokens = _usage_value(usage, "input_tokens")
         output_tokens = _usage_value(usage, "output_tokens")
         total_tokens = _usage_value(usage, "total_tokens") or input_tokens + output_tokens
-        self.usage["input_tokens"] += input_tokens
-        self.usage["output_tokens"] += output_tokens
-        self.usage["total_tokens"] += total_tokens
-
+        with PROVIDER_LOCK:
+            self.usage["input_tokens"] += input_tokens
+            self.usage["output_tokens"] += output_tokens
+            self.usage["total_tokens"] += total_tokens
 
 
 def _predict_with_resume(
@@ -235,27 +244,22 @@ def _predict_with_resume(
     manifest_path: Path,
     output: Path,
 ) -> list[PredictionRow]:
-    """Generate OpenAI predictions incrementally so interrupted evals can resume."""
-    existing = _existing_predictions(output, tool_protocol=provider.tool_protocol)
-    predictions: list[PredictionRow] = []
-    output.parent.mkdir(parents=True, exist_ok=True)
-    with output.open("a", encoding="utf-8") as handle:
-        for index, row in enumerate(rows, start=1):
-            cell_id = _required_str(row, "cell_id")
-            print_eval_case_progress(
-                OPENAI_UNDERSTANDING_PROVIDER, provider.model, cell_id, index, len(rows)
-            )
-            if cell_id in existing:
-                predictions.append(existing[cell_id])
-                continue
-            try:
-                prediction = provider.predict(row, manifest_path=manifest_path)
-            except PredictionFormatError as exc:
-                prediction = _error_prediction(row, provider, exc)
-            handle.write(f"{canonical_json(prediction)}\n")
-            handle.flush()
-            predictions.append(prediction)
-    return predictions
+    """Generate OpenAI predictions, IB_CASE_WORKERS at a time, so interrupted evals can resume."""
+    def one(row: dict[str, Any]) -> PredictionRow:
+        try:
+            return provider.predict(row, manifest_path=manifest_path)
+        except PredictionFormatError as exc:
+            return _error_prediction(row, provider, exc)
+
+    return predict_rows(
+        rows,
+        _existing_predictions(output, tool_protocol=provider.tool_protocol),
+        one,
+        output=output,
+        progress=lambda cell_id, done, total: print_eval_case_progress(
+            OPENAI_UNDERSTANDING_PROVIDER, provider.model, cell_id, done, total
+        ),
+    )
 
 
 def _error_prediction(
@@ -350,12 +354,6 @@ def _audio_format(path: Path) -> str:
     return suffix
 
 
-def _prompt_for(row: dict[str, Any], audio_paths: list[Path]) -> str:
-    return "\n\n".join(
-        [_system_prompt_with_setup(row), _user_prompt_for(row, audio_paths)]
-    )
-
-
 def _system_prompt_for(row: dict[str, Any], *, native_tools: bool = False) -> str:
     _ = row
     kind = "core_native" if native_tools else "core"
@@ -383,11 +381,17 @@ def _json_user_prompt(row: dict[str, Any], audio_paths: list[Path]) -> str:
     return ""
 
 
-def _openai_history_messages(row: dict[str, Any], audio_paths: list[Path]) -> list[dict[str, Any]]:
+def _openai_history_messages(
+    row: dict[str, Any], audio_paths: list[Path], *, tool_protocol: str = "prompt_json"
+) -> list[dict[str, Any]]:
     messages: list[dict[str, Any]] = []
+    note = final_turn_note(row, tool_protocol=tool_protocol)
     for message in history_messages(row, audio_paths):
         if message.role == "user":
-            messages.append({"role": "user", "content": [_audio_part(_required_audio_path(message))]})
+            content: list[dict[str, Any]] = [_audio_part(_required_audio_path(message))]
+            if note and message.final_user_turn:
+                content.append({"type": "text", "text": note})
+            messages.append({"role": "user", "content": content})
         elif message.assistant_text is not None:
             messages.append({"role": "assistant", "content": message.assistant_text})
     return messages

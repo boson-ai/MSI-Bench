@@ -13,6 +13,7 @@ is the only side-effecting operation and appends one validated UTF-8 JSONL row.
 from __future__ import annotations
 
 import base64
+import threading
 from collections.abc import Mapping
 from dataclasses import asdict, is_dataclass
 from datetime import date, datetime, time
@@ -29,6 +30,7 @@ from ib.models.raw_response import (
 
 
 RAW_RESPONSES_FILENAME = "raw_responses.jsonl"
+_APPEND_LOCK = threading.Lock()  # cases run concurrently (ib.scoring.case_pool); a long row must not interleave
 
 
 def raw_response_path(predictions_path: str | Path) -> Path:
@@ -104,8 +106,9 @@ def append_raw_response(
         response=json_safe_response(response),
         metadata=json_safe_response(dict(metadata or {})),
     )
-    with destination.open("a", encoding="utf-8") as handle:
-        handle.write(f"{canonical_json(row)}\n")
+    line = f"{canonical_json(row)}\n"
+    with _APPEND_LOCK, destination.open("a", encoding="utf-8") as handle:
+        handle.write(line)
         handle.flush()
 
 

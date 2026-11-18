@@ -16,6 +16,8 @@ import os
 from pathlib import Path
 from typing import Literal
 
+from ib.site_paths import model_path
+
 LocalAudioTransport = Literal["audio_url", "transcription_only"]
 SystemPromptMode = Literal["system", "first_user"]
 
@@ -37,7 +39,7 @@ class LocalAudioModelSpec:
 LOCAL_AUDIO_MODELS: dict[str, LocalAudioModelSpec] = {
     "gemma-4-12B-it": LocalAudioModelSpec(
         model="gemma-4-12B-it",
-        checkpoint_path=Path("<models-root>/gemma-4-12B-it"),
+        checkpoint_path=model_path("gemma-4-12B-it"),
         default_base_url="http://localhost:8014/v1",
         base_url_env="GEMMA4_UNDERSTANDING_BASE_URL",
         supports_thinking=True,
@@ -47,14 +49,14 @@ LOCAL_AUDIO_MODELS: dict[str, LocalAudioModelSpec] = {
     ),
     "MiMo-Audio-7B-Instruct": LocalAudioModelSpec(
         model="MiMo-Audio-7B-Instruct",
-        checkpoint_path=Path("<models-root>/MiMo-Audio-7B-Instruct"),
+        checkpoint_path=model_path("MiMo-Audio-7B-Instruct"),
         default_base_url="http://localhost:8015/v1",
         base_url_env="MIMO_AUDIO_UNDERSTANDING_BASE_URL",
         supports_thinking=True,
     ),
     "Voxtral-Small-24B-2507": LocalAudioModelSpec(
         model="Voxtral-Small-24B-2507",
-        checkpoint_path=Path("<models-root>/Voxtral-Small-24B-2507"),
+        checkpoint_path=model_path("Voxtral-Small-24B-2507"),
         default_base_url="http://localhost:8016/v1",
         base_url_env="VOXTRAL_UNDERSTANDING_BASE_URL",
         system_prompt_mode="first_user",
@@ -62,32 +64,32 @@ LOCAL_AUDIO_MODELS: dict[str, LocalAudioModelSpec] = {
     ),
     "Qwen3-Omni-30B-A3B-Instruct": LocalAudioModelSpec(
         model="Qwen3-Omni-30B-A3B-Instruct",
-        checkpoint_path=Path("<models-root>/Qwen3-Omni-30B-A3B-Instruct"),
+        checkpoint_path=model_path("Qwen3-Omni-30B-A3B-Instruct"),
         default_base_url="http://localhost:8013/v1",
         base_url_env="QWEN_UNDERSTANDING_BASE_URL",
     ),
     "Kimi-Audio-7B-Instruct": LocalAudioModelSpec(
         model="Kimi-Audio-7B-Instruct",
-        checkpoint_path=Path("<models-root>/Kimi-Audio-7B-Instruct"),
+        checkpoint_path=model_path("Kimi-Audio-7B-Instruct"),
         default_base_url="http://localhost:8017/v1",
         base_url_env="KIMI_AUDIO_UNDERSTANDING_BASE_URL",
         transport="transcription_only",
     ),
     "Qwen2.5-Omni-7B": LocalAudioModelSpec(
         model="Qwen2.5-Omni-7B",
-        checkpoint_path=Path("<models-root>/Qwen2.5-Omni-7B"),
+        checkpoint_path=model_path("Qwen2.5-Omni-7B"),
         default_base_url="http://localhost:8018/v1",
         base_url_env="QWEN25_OMNI_UNDERSTANDING_BASE_URL",
     ),
     "Phi-4-multimodal-instruct": LocalAudioModelSpec(
         model="Phi-4-multimodal-instruct",
-        checkpoint_path=Path("<models-root>/Phi-4-multimodal-instruct"),
+        checkpoint_path=model_path("Phi-4-multimodal-instruct"),
         default_base_url="http://localhost:8019/v1",
         base_url_env="PHI4_MULTIMODAL_UNDERSTANDING_BASE_URL",
     ),
     "Qwen2-Audio-7B-Instruct": LocalAudioModelSpec(
         model="Qwen2-Audio-7B-Instruct",
-        checkpoint_path=Path("<models-root>/Qwen2-Audio-7B-Instruct"),
+        checkpoint_path=model_path("Qwen2-Audio-7B-Instruct"),
         default_base_url="http://localhost:8020/v1",
         base_url_env="QWEN2_AUDIO_UNDERSTANDING_BASE_URL",
     ),

@@ -1,0 +1,4 @@
+base:
+  - name: phi-4-multimodal
+    provider: local
+    model: Phi-4-multimodal-instruct

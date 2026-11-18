@@ -73,7 +73,7 @@ def render_available_function_catalog(available_functions: list[dict]) -> str:
             hints = TOOL_ARGUMENT_HINTS.get(tool_name, ("arguments_from_spoken_evidence",))
             rendered = ", ".join(hints)
         functions.append({"name": tool_name, "arguments": rendered})
-    return render_prompt("understanding/system.j2", {"kind": "tool_catalog", "functions": functions})
+    return render_prompt("understanding/system_v1.j2", {"kind": "tool_catalog", "functions": functions})
 
 
 def render_tool_catalog(tool_names: tuple[str, ...]) -> str:
@@ -82,4 +82,4 @@ def render_tool_catalog(tool_names: tuple[str, ...]) -> str:
     for tool_name in tool_names:
         hints = TOOL_ARGUMENT_HINTS.get(tool_name, ("arguments_from_spoken_evidence",))
         functions.append({"name": tool_name, "arguments": ", ".join(hints)})
-    return render_prompt("understanding/system.j2", {"kind": "tool_catalog", "functions": functions})
+    return render_prompt("understanding/system_v1.j2", {"kind": "tool_catalog", "functions": functions})

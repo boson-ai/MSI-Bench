@@ -3,5 +3,4 @@ __pycache__/
 .venv/
 .env
 artifacts/
-slurm-logs/
 logs/

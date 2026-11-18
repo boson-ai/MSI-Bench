@@ -22,9 +22,9 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
-from ib.eval_targets import GeminiThinkingMode
-from ib.io import canonical_json, write_jsonl
-from ib.predictions import PredictionRow, read_predictions
+from ib.scoring.eval_targets import GeminiThinkingMode
+from ib.io import write_jsonl
+from ib.scoring.predictions import PredictionRow, read_predictions
 from ib.scoring.openai_understanding import (
     PredictionFormatError,
     UnderstandingProviderError,
@@ -43,8 +43,10 @@ from ib.scoring.multiturn_audio import history_messages
 from ib.scoring.native_tool_schema import (
     NativeToolBundle,
     build_native_tool_bundle,
+    native_bundle_for_row,
     gemini_function_declarations,
 )
+from ib.scoring.case_pool import PROVIDER_LOCK, predict_rows
 from ib.scoring.progress import print_eval_case_progress
 from ib.scoring.raw_response_io import append_raw_response, raw_response_path
 from ib.scoring.smoke import _read_rows
@@ -167,7 +169,7 @@ class GeminiUnderstandingProvider:
             audio_paths = []
         native_tools = self.tool_protocol == "native"
         native_bundle = (
-            build_native_tool_bundle(manifest_row.get("logic_available_functions"))
+            native_bundle_for_row(manifest_row)
             if native_tools
             else NativeToolBundle(declarations=[], name_map={})
         )
@@ -189,7 +191,8 @@ class GeminiUnderstandingProvider:
                 native_bundle=native_bundle if native_tools else None,
                 transcript=transcript,
             )
-            self.call_count += 1
+            with PROVIDER_LOCK:
+                self.call_count += 1
             self._record_usage(response)
             if self.raw_response_output is not None:
                 append_raw_response(
@@ -280,6 +283,11 @@ class GeminiUnderstandingProvider:
         raise UnderstandingProviderError(f"Gemini request failed for {cell_id}")
 
     def _client(self) -> Any:
+        # cases run on threads (case_pool): a second client would close the first when it is collected
+        with PROVIDER_LOCK:
+            return self._make_client()
+
+    def _make_client(self) -> Any:
         if self.client is not None:
             return self.client
         api_key = self.api_key or os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
@@ -356,9 +364,10 @@ class GeminiUnderstandingProvider:
         total_tokens = (
             _gemini_usage_value(usage, "total_token_count") or input_tokens + output_tokens
         )
-        self.usage["input_tokens"] += input_tokens
-        self.usage["output_tokens"] += output_tokens
-        self.usage["total_tokens"] += total_tokens
+        with PROVIDER_LOCK:
+            self.usage["input_tokens"] += input_tokens
+            self.usage["output_tokens"] += output_tokens
+            self.usage["total_tokens"] += total_tokens
 
 
 def _transcript_contents(transcript: str) -> list[Any]:
@@ -375,6 +384,10 @@ def _transcript_contents(transcript: str) -> list[Any]:
     ]
 
 
+def _audio_bytes_part(types: Any, path: Path) -> Any:
+    return types.Part.from_bytes(data=path.read_bytes(), mime_type=_mime_type(path))
+
+
 def _history_contents(row: dict[str, Any], audio_paths: list[Path]) -> list[Any]:
     try:
         types: Any = importlib.import_module("google.genai.types")
@@ -386,15 +399,7 @@ def _history_contents(row: dict[str, Any], audio_paths: list[Path]) -> list[Any]
             if message.audio_path is None:
                 raise UnderstandingProviderError("user audio history message missing audio_path")
             contents.append(
-                types.Content(
-                    role="user",
-                    parts=[
-                        types.Part.from_bytes(
-                            data=message.audio_path.read_bytes(),
-                            mime_type=_mime_type(message.audio_path),
-                        )
-                    ],
-                )
+                types.Content(role="user", parts=[_audio_bytes_part(types, message.audio_path)])
             )
         elif message.assistant_text is not None:
             contents.append(
@@ -412,26 +417,21 @@ def _predict_with_resume(
     manifest_path: Path,
     output: Path,
 ) -> list[PredictionRow]:
-    existing = _existing_predictions(output, tool_protocol=provider.tool_protocol)
-    predictions: list[PredictionRow] = []
-    output.parent.mkdir(parents=True, exist_ok=True)
-    with output.open("a", encoding="utf-8") as handle:
-        for index, row in enumerate(rows, start=1):
-            cell_id = _required_str(row, "cell_id")
-            print_eval_case_progress(
-                GEMINI_UNDERSTANDING_PROVIDER, provider.model, cell_id, index, len(rows)
-            )
-            if cell_id in existing:
-                predictions.append(existing[cell_id])
-                continue
-            try:
-                prediction = provider.predict(row, manifest_path=manifest_path)
-            except PredictionFormatError as exc:
-                prediction = _error_prediction(row, provider, exc)
-            handle.write(f"{canonical_json(prediction)}\n")
-            handle.flush()
-            predictions.append(prediction)
-    return predictions
+    def one(row: dict[str, Any]) -> PredictionRow:
+        try:
+            return provider.predict(row, manifest_path=manifest_path)
+        except PredictionFormatError as exc:
+            return _error_prediction(row, provider, exc)
+
+    return predict_rows(
+        rows,
+        _existing_predictions(output, tool_protocol=provider.tool_protocol),
+        one,
+        output=output,
+        progress=lambda cell_id, done, total: print_eval_case_progress(
+            GEMINI_UNDERSTANDING_PROVIDER, provider.model, cell_id, done, total
+        ),
+    )
 
 
 def _error_prediction(

@@ -1,0 +1,4 @@
+base:
+  - name: qwen3-omni-30b
+    provider: local
+    model: Qwen3-Omni-30B-A3B-Instruct

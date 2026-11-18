@@ -1,0 +1,5 @@
+# gpt-audio-mini over the OpenAI API with native tools (the v1 protocol for API models).
+base:
+  - name: gpt-audio-mini
+    provider: openai
+    model: gpt-audio-mini

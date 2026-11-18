@@ -137,8 +137,10 @@ def test_exact_values_are_type_strict() -> None:
     assert result.unmatched_required_indices == [0]
 
 
-@pytest.mark.parametrize("predicted", [4, 4.0])
-def test_number_equal_accepts_only_equal_json_numbers(predicted: object) -> None:
+@pytest.mark.parametrize(
+    ("predicted", "passed"), [(4, True), (4.0, True), ("4", False), (True, False), (4.1, False)]
+)
+def test_number_equal_accepts_only_equal_json_numbers(predicted: object, passed: bool) -> None:
     spec = ExactMultisetValidation(
         required_calls=[
             RequiredToolCall(
@@ -148,25 +150,10 @@ def test_number_equal_accepts_only_equal_json_numbers(predicted: object) -> None
         ]
     )
 
-    assert validate_tool_calls(
+    result = validate_tool_calls(
         spec, [{"name": "set_amount", "arguments": {"amount": predicted}}]
-    ).passed
-
-
-@pytest.mark.parametrize("predicted", ["4", True, 4.1])
-def test_number_equal_rejects_coercion_and_unequal_values(predicted: object) -> None:
-    spec = ExactMultisetValidation(
-        required_calls=[
-            RequiredToolCall(
-                name="set_amount",
-                arguments={"amount": NumberEqualArgumentMatcher(value=4)},
-            )
-        ]
     )
-
-    assert not validate_tool_calls(
-        spec, [{"name": "set_amount", "arguments": {"amount": predicted}}]
-    ).passed
+    assert result.passed is passed
 
 
 def test_one_of_and_set_equals_match_values_without_list_order() -> None:
@@ -304,7 +291,6 @@ def test_manifest_convenience_result_retains_spec_source() -> None:
         [{"name": "lookup", "arguments": {}}],
     )
 
-    assert result is not None
     assert result.passed is True
     assert result.source == "legacy"
     assert validate_manifest_tool_calls({}, []) is None

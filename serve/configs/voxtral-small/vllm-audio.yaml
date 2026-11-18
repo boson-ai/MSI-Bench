@@ -1,6 +1,6 @@
 # Calling spec: vllm serve --config /config/vllm-audio.yaml
 # Serves Voxtral Small audio chat without system-role prompts.
-model: /models/Voxtral-Small-24B-2507
+model: <path-to-checkpoint>/Voxtral-Small-24B-2507
 served-model-name: Voxtral-Small-24B-2507
 tensor-parallel-size: 2
 gpu-memory-utilization: 0.85

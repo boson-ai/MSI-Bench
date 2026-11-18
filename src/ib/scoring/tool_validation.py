@@ -3,14 +3,20 @@
 Calling spec:
     resolve_tool_validation_spec(row) -> (spec | None, "explicit" | "legacy" | None)
     strict_spec_from_gold_calls(calls) -> ToolValidationSpec
+    effective_call_indices(spec, calls) -> list[int]
+    effective_tool_calls(row, calls) -> list
     validate_tool_calls(spec, calls) -> ToolValidationResult
     validate_manifest_tool_calls(row, calls) -> ToolValidationResult | None
 
-All matching is exact and order-independent. The module has no side effects.
+All matching is exact and order-independent. A spec's read_only_call_names drop
+surplus read-only calls before matching: a read-only tool required k times keeps
+only its last k calls, one not required is dropped entirely. Forbidden and
+invalid calls are still found among all calls. The module has no side effects.
 """
 
 from __future__ import annotations
 
+from collections import Counter
 from collections.abc import Mapping
 from typing import Any
 
@@ -44,6 +50,8 @@ DETERMINISTIC_TOOL_VALIDATOR_PREFIX = "deterministic tool validator:"
 __all__ = [
     "DETERMINISTIC_TOOL_VALIDATOR_PREFIX",
     "TOOL_VALIDATOR_POLICY_VERSION",
+    "effective_call_indices",
+    "effective_tool_calls",
     "resolve_tool_validation_spec",
     "strict_spec_from_gold_calls",
     "validate_manifest_tool_calls",
@@ -100,6 +108,29 @@ def strict_spec_from_gold_calls(expected_calls: Any) -> ToolValidationSpec:
     return ExactMultisetValidation(required_calls=required_calls)
 
 
+def effective_call_indices(spec: ToolValidationSpec, predicted_calls: list[Any]) -> list[int]:
+    """Return ascending indices of the calls that count; surplus read-only calls drop out."""
+    read_only = set(getattr(spec, "read_only_call_names", []))
+    quota = Counter(call.name for call in _required_calls(spec) if call.name in read_only)
+    kept: list[int] = []
+    for index in reversed(range(len(predicted_calls))):
+        call = _model_or_mapping(predicted_calls[index])
+        if _valid_predicted_call(call) and call["name"] in read_only:
+            if quota[call["name"]] == 0:
+                continue
+            quota[call["name"]] -= 1
+        kept.append(index)
+    return kept[::-1]
+
+
+def effective_tool_calls(manifest_row: Mapping[str, Any], predicted_calls: list[Any]) -> list[Any]:
+    """Return the row's effective calls, or all calls when the row has no validation spec."""
+    spec, _source = resolve_tool_validation_spec(manifest_row)
+    if spec is None:
+        return list(predicted_calls)
+    return [predicted_calls[index] for index in effective_call_indices(spec, predicted_calls)]
+
+
 def validate_tool_calls(
     spec: ToolValidationSpec,
     predicted_calls: list[Any],
@@ -108,6 +139,7 @@ def validate_tool_calls(
     if not isinstance(predicted_calls, list):
         raise ValueError("predicted_calls must be a list")
     required_calls = _required_calls(spec)
+    kept_indices = effective_call_indices(spec, predicted_calls)
     normalized = [_model_or_mapping(call) for call in predicted_calls]
     invalid_indices = [
         index for index, call in enumerate(normalized) if not _valid_predicted_call(call)
@@ -121,8 +153,8 @@ def validate_tool_calls(
     adjacency = [
         [
             predicted_index
-            for predicted_index, predicted_call in enumerate(normalized)
-            if _call_matches(requirement, predicted_call)
+            for predicted_index in kept_indices
+            if _call_matches(requirement, normalized[predicted_index])
         ]
         for requirement in required_calls
     ]
@@ -132,9 +164,9 @@ def validate_tool_calls(
     unmatched_required = [
         index for index in range(len(required_calls)) if index not in matched_required
     ]
-    unmatched_predicted = [
-        index for index in range(len(predicted_calls)) if index not in matched_predicted
-    ]
+    unmatched_predicted = [index for index in kept_indices if index not in matched_predicted]
+    kept = set(kept_indices)
+    ignored = [index for index in range(len(predicted_calls)) if index not in kept]
     passed = _validation_passed(
         spec,
         unmatched_required=unmatched_required,
@@ -159,6 +191,7 @@ def validate_tool_calls(
         unmatched_predicted_indices=unmatched_predicted,
         forbidden_predicted_indices=forbidden_indices,
         invalid_predicted_indices=invalid_indices,
+        ignored_predicted_indices=ignored,
     )
 
 

@@ -1,6 +1,6 @@
 # Calling spec: vllm serve --config /config/vllm-gemma4.yaml
 # Serves Gemma 4 12B text-out/audio-in; request-level kwargs select thinking.
-model: /models/gemma-4-12B-it
+model: <path-to-checkpoint>/gemma-4-12B-it
 served-model-name: gemma-4-12B-it
 tensor-parallel-size: 1
 gpu-memory-utilization: 0.9

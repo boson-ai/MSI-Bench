@@ -1,4 +1,4 @@
-model: /models/Qwen3-Omni-30B-A3B-Instruct
+model: <path-to-checkpoint>/Qwen3-Omni-30B-A3B-Instruct
 served-model-name: Qwen3-Omni-30B-A3B-Instruct
 tensor-parallel-size: 1
 dtype: bfloat16

@@ -66,32 +66,9 @@ class ExpectedAction(_StrEnum):
     refuse = "refuse"
 
 
-class ReverbLevel(_StrEnum):
-    """Axis E.1 — convolutional room impulse response."""
-
-    dry = "dry"
-    mild_room = "mild_room"
-    large_hall = "large_hall"
-    car_cabin = "car_cabin"
-    bathroom = "bathroom"
-
-
 class CompetingSpeechLevel(_StrEnum):
     """Axis E.2 — informational masking by intelligible non-target speech."""
 
     none = "none"
     bystander_voice = "bystander_voice"
-    public_speech = "public_speech"
-    tv_speech = "tv_speech"
-    party_babble = "party_babble"
 
-
-class ChannelLevel(_StrEnum):
-    """Axis E.3 — capture and transmission path."""
-
-    clean_close = "clean_close"
-    far_field_static = "far_field_static"
-    far_field_moving = "far_field_moving"
-    phone_codec = "phone_codec"
-    BT_codec = "BT_codec"
-    compressed_low = "compressed_low"

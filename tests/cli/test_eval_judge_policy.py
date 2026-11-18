@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 
-from ib.cli import eval as eval_module
+from ib.evaluation import target as eval_target
 from ib.scoring.eval import MANIFEST_EVAL_POLICY_VERSION
 from ib.scoring.judge import ANSWER_JUDGE_POLICY_VERSION
 from ib.scoring.report_policy import summary_report_has_policy
@@ -18,7 +18,7 @@ def test_matching_answer_judge_requires_current_policy_version() -> None:
     }
 
     assert (
-        eval_module._summary_has_matching_answer_judge(
+        eval_target._summary_has_matching_answer_judge(
             summary,
             judge_provider="openai",
             judge_model="gpt-5.5",
@@ -28,7 +28,7 @@ def test_matching_answer_judge_requires_current_policy_version() -> None:
 
     summary["answer_judge_policy_version"] = ANSWER_JUDGE_POLICY_VERSION
 
-    assert eval_module._summary_has_matching_answer_judge(
+    assert eval_target._summary_has_matching_answer_judge(
         summary,
         judge_provider="openai",
         judge_model="gpt-5.5",
@@ -61,9 +61,9 @@ def test_replacing_old_judge_recomputes_base_pass_state(tmp_path, monkeypatch) -
         del args, kwargs
         return {"errors": [], "pass_rate": 1.0}
 
-    monkeypatch.setattr(eval_module, "run_answer_judge", passing_judge)
+    monkeypatch.setattr(eval_target, "run_answer_judge", passing_judge)
 
-    updated = eval_module._add_answer_judge_to_summary(
+    updated = eval_target._add_answer_judge_to_summary(
         root,
         summary,
         judge_provider="openai",
@@ -85,7 +85,7 @@ def test_base_eval_reports_rejects_stale_manifest_policy(tmp_path) -> None:
     (tmp_path / "rubric_eval.json").write_text('{"errors": []}\n', encoding="utf-8")
     (tmp_path / "manifest_eval.json").write_text('{"errors": []}\n', encoding="utf-8")
 
-    assert eval_module._base_eval_reports_pass(tmp_path, reports) is False
+    assert eval_target._base_eval_reports_pass(tmp_path, reports) is False
     assert (
         summary_report_has_policy(
             tmp_path,
@@ -101,7 +101,7 @@ def test_base_eval_reports_rejects_stale_manifest_policy(tmp_path) -> None:
         encoding="utf-8",
     )
 
-    assert eval_module._base_eval_reports_pass(tmp_path, reports) is True
+    assert eval_target._base_eval_reports_pass(tmp_path, reports) is True
     assert summary_report_has_policy(
         tmp_path,
         reports,
@@ -118,7 +118,7 @@ def test_failed_judge_calls_block_target_reuse(tmp_path) -> None:
     (root / "answer_judge.json").write_text(
         json.dumps({"errors": []}), encoding="utf-8"
     )
-    assert eval_module._answer_judge_report_has_failed_calls(root, summary) is False
+    assert eval_target._answer_judge_report_has_failed_calls(root, summary) is False
 
     (root / "answer_judge.json").write_text(
         json.dumps(
@@ -131,11 +131,11 @@ def test_failed_judge_calls_block_target_reuse(tmp_path) -> None:
         ),
         encoding="utf-8",
     )
-    assert eval_module._answer_judge_report_has_failed_calls(root, summary) is True
+    assert eval_target._answer_judge_report_has_failed_calls(root, summary) is True
 
     (root / "answer_judge.json").write_text("not json", encoding="utf-8")
-    assert eval_module._answer_judge_report_has_failed_calls(root, summary) is True
+    assert eval_target._answer_judge_report_has_failed_calls(root, summary) is True
 
     assert (
-        eval_module._answer_judge_report_has_failed_calls(root, {"reports": {}}) is False
+        eval_target._answer_judge_report_has_failed_calls(root, {"reports": {}}) is False
     )

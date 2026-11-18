@@ -21,12 +21,12 @@ import os
 from pathlib import Path
 from typing import Any
 
-from ib.eval_targets import GeminiThinkingMode
+from ib.scoring.eval_targets import GeminiThinkingMode
 from ib.scoring.probe_sampling import inject_offset_s_for_row
-from ib.io import canonical_json, write_jsonl
+from ib.io import write_jsonl
 from ib.llm import render_prompt
 from ib.models.raw_response import RawResponsePhase
-from ib.predictions import PredictionRow, read_predictions
+from ib.scoring.predictions import PredictionRow, read_predictions
 from ib.scoring.gemini_understanding import _mime_type, _normalize_gemini_model
 from ib.scoring.openai_realtime_audio import (
     DEFAULT_REALTIME_SAMPLE_RATE,
@@ -47,6 +47,7 @@ from ib.scoring.openai_understanding import (
 )
 from ib.scoring.multiturn_audio import history_messages, setup_prompt_for
 from ib.scoring.native_tool_schema import build_native_tool_bundle, gemini_live_tools
+from ib.scoring.case_pool import apredict_rows
 from ib.scoring.progress import print_eval_case_progress
 from ib.scoring.raw_response_io import (
     append_raw_response,
@@ -148,7 +149,8 @@ class GeminiLiveProvider:
             ),
         ) as session:
             await session.send_client_content(
-                turns=_gemini_contents(manifest_row, audio_paths), turn_complete=True
+                turns=_gemini_contents(manifest_row, audio_paths),
+                turn_complete=True,
             )
             capture = await _collect_gemini_response(session, timeout_s=self.recv_timeout_s)
         self.call_count += 1
@@ -196,7 +198,8 @@ class GeminiLiveProvider:
             ),
         ) as session:
             await session.send_client_content(
-                turns=_gemini_contents(manifest_row, audio_paths), turn_complete=True
+                turns=_gemini_contents(manifest_row, audio_paths),
+                turn_complete=True,
             )
             capture = await _collect_gemini_response(
                 session,
@@ -326,26 +329,21 @@ async def _apredict_with_resume(
     manifest_path: Path,
     output: Path,
 ) -> list[PredictionRow]:
-    existing = _existing_predictions(output)
-    predictions: list[PredictionRow] = []
-    output.parent.mkdir(parents=True, exist_ok=True)
-    with output.open("a", encoding="utf-8") as handle:
-        for index, row in enumerate(rows, start=1):
-            cell_id = _required_str(row, "cell_id")
-            print_eval_case_progress(
-                GEMINI_FULLDUPLEX_PROVIDER, provider.model, cell_id, index, len(rows)
-            )
-            if cell_id in existing:
-                predictions.append(existing[cell_id])
-                continue
-            try:
-                prediction = await provider.predict(row, manifest_path=manifest_path)
-            except GeminiLiveTimeoutError as exc:
-                prediction = _timeout_prediction(row, provider, exc)
-            handle.write(f"{canonical_json(prediction)}\n")
-            handle.flush()
-            predictions.append(prediction)
-    return predictions
+    async def one(row: dict[str, Any]) -> PredictionRow:
+        try:
+            return await provider.predict(row, manifest_path=manifest_path)
+        except GeminiLiveTimeoutError as exc:
+            return _timeout_prediction(row, provider, exc)
+
+    return await apredict_rows(
+        rows,
+        _existing_predictions(output),
+        one,
+        output=output,
+        progress=lambda cell_id, done, total: print_eval_case_progress(
+            GEMINI_FULLDUPLEX_PROVIDER, provider.model, cell_id, done, total
+        ),
+    )
 
 
 def _timeout_prediction(
@@ -553,10 +551,6 @@ def _json_user_prompt(row: dict[str, Any], audio_paths: list[Path]) -> str:
     return ""
 
 
-def _gemini_tools(functions: Any) -> list[dict[str, Any]]:
-    return gemini_live_tools(build_native_tool_bundle(functions))
-
-
 def _live_system_prompt(row: dict[str, Any]) -> str:
     return render_prompt(
         "understanding/system.j2",
@@ -565,13 +559,11 @@ def _live_system_prompt(row: dict[str, Any]) -> str:
 
 
 def _live_user_prompt(row: dict[str, Any], audio_paths: list[Path]) -> str:
-    functions = row.get("logic_available_functions")
     return render_prompt(
         "understanding/user.j2",
         {
             "kind": "live",
             "audio_count": len(audio_paths),
-            "available_functions": str(functions or []),
         },
     )
 

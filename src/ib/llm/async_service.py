@@ -4,19 +4,20 @@ Calling spec:
     service = LlmService(LlmConfig())
     text = (await service.acomplete(request, module="planner.director")).text
     payload = await service.acomplete_json(request, module="scoring.judge")
-    summary = service.cost.summary()
+    summary = service.usage.summary()
     await service.aclose()
 
 One LlmService is built per run and shared across all concurrent calls so the
-rate limiter throttles globally and the cost tracker aggregates the whole run.
-Pipeline: rate-limit slot -> retry(timeout(adapter)) -> record cost -> return.
+rate limiter throttles globally and the usage tracker aggregates the whole run.
+Pipeline: rate-limit slot -> retry(timeout(adapter)) -> record usage -> return.
 
 ``request.client`` overrides the shared client (test injection / a provider's own
 client); otherwise OpenAI-compatible clients are built lazily per provider, API
-key, and base URL. Gemini uses the Interactions REST adapter directly.
+key, and base URL. Gemini uses the Interactions REST adapter directly. Claude models go to the
+Anthropic API (AsyncAnthropic) when CLAUDE_API_KEY is set; see ib.llm.claude_direct.
 
 Side effects: HTTP calls via provider adapters, asyncio.sleep via retries.
-Dependencies: ib.llm.{service,config,rate_limit,retry,cost}
+Dependencies: ib.llm.{service,config,rate_limit,retry,usage}
 """
 
 from __future__ import annotations
@@ -25,11 +26,12 @@ import asyncio
 from typing import Any
 
 from ib.llm.config import LlmConfig
-from ib.llm.cost import CostTracker, LlmUsage
+from ib.llm.usage import LlmUsage, UsageTracker
 from ib.llm.rate_limit import RateLimiter
 from ib.llm.retry import RetryPolicy, retry_async
+from ib.llm.claude_direct import ANTHROPIC_PROVIDER, AsyncClaudeLlmProvider, async_client
+from ib.llm.gemini import AsyncGeminiLlmProvider
 from ib.llm.service import (
-    AsyncGeminiLlmProvider,
     AsyncOpenAiLlmProvider,
     LlmProviderError,
     LlmRequest,
@@ -41,9 +43,9 @@ from ib.llm.service import (
 
 
 class LlmService:
-    """Async facade: provider-routed LLM calls with rate limiting + cost tracking."""
+    """Async facade: provider-routed LLM calls with rate limiting + usage tracking."""
 
-    def __init__(self, config: LlmConfig | None = None, cost: CostTracker | None = None) -> None:
+    def __init__(self, config: LlmConfig | None = None, usage: UsageTracker | None = None) -> None:
         self._config = config or LlmConfig()
         self._rate_limiter = RateLimiter(
             max_concurrency=self._config.max_concurrency, rpm=self._config.rpm
@@ -53,13 +55,10 @@ class LlmService:
             base_delay_s=self._config.retry_base_delay_s,
             max_delay_s=self._config.retry_max_delay_s,
         )
-        self.cost = cost or CostTracker(
-            budget_usd=self._config.budget_usd,
-            warn_at_percent=self._config.warn_at_percent,
-            default_cost_per_1m=self._config.default_cost_per_1m_tokens,
-        )
+        self.usage = usage or UsageTracker()
         self._openai_adapter = AsyncOpenAiLlmProvider()
         self._gemini_adapter = AsyncGeminiLlmProvider()
+        self._claude_adapter = AsyncClaudeLlmProvider()
         self._clients: dict[tuple[str, str | None, str | None], Any] = {}
 
     def _client_for(self, request: LlmRequest) -> Any:
@@ -79,6 +78,9 @@ class LlmService:
     def _build_client(self, request: LlmRequest) -> Any:
         import os
 
+        if request.provider == ANTHROPIC_PROVIDER:
+            return async_client(request)
+
         resolved = request.api_key or os.getenv("OPENAI_API_KEY")
         if request.base_url is not None:
             resolved = resolved or "EMPTY"
@@ -95,13 +97,15 @@ class LlmService:
             kwargs["base_url"] = request.base_url
         return AsyncOpenAI(**kwargs)
 
-    def _adapter_for(self, request: LlmRequest) -> AsyncOpenAiLlmProvider | AsyncGeminiLlmProvider:
+    def _adapter_for(self, request: LlmRequest) -> AsyncOpenAiLlmProvider | AsyncGeminiLlmProvider | AsyncClaudeLlmProvider:
         if request.provider == "gemini":
             return self._gemini_adapter
+        if request.provider == ANTHROPIC_PROVIDER:
+            return self._claude_adapter
         return self._openai_adapter
 
     async def acomplete(self, request: LlmRequest, *, module: str = "") -> LlmResponse:
-        """Rate-limited, retried single completion; records cost on success."""
+        """Rate-limited, retried single completion; records usage on success."""
         request = _with_provider_defaults(request)
         client = self._client_for(request)
         adapter = self._adapter_for(request)
@@ -122,7 +126,7 @@ class LlmService:
                 self._retry_policy, _call, label=module or request.model
             )
 
-        await self.cost.record(
+        await self.usage.record(
             LlmUsage(
                 model=response.model or request.model,
                 module=module,

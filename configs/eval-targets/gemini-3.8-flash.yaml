@@ -1,0 +1,5 @@
+# ib eval target for gemini-3.8-flash, turn_based, native tools, the API's default thinking (MSI-Bench v2).
+base:
+  - name: gemini-3.8-flash
+    provider: gemini
+    model: gemini-3.8-flash

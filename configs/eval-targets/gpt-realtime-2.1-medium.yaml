@@ -1,0 +1,7 @@
+# ib eval targets for the gpt-realtime-2.1 medium fullduplex run (MSI-Bench v2).
+live:
+  - name: gpt-realtime-2.1-medium
+    live:
+      provider: openai_realtime
+      model: gpt-realtime-2.1
+      reasoning_effort: medium

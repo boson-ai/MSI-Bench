@@ -1,50 +1,35 @@
 {% if kind == "setup" -%}
-Assistant authorization policy:
-{% if authorization.scope %}
-- scope: {{ authorization.scope }}
-- capability governed by this policy: {{ authorization.capability }}
-- policy: {{ authorization.policy_text }}
-- available speaker profiles:
-{% for profile in authorization.speaker_profiles %}
-  - {{ profile.speaker }}: name={{ profile.display_name }}, role={{ profile.scene_role }}, enrolled={{ profile.enrolled }}, tier={{ profile.role_tier }}, capabilities={{ profile.capabilities }}
-{% endfor %}
-{% else %}
-- None
+The assistant already has this conversation context.
+{% if assistant_name %}
+Your name is {{ assistant_name }}. The speakers call you by this name.
 {% endif %}
 
-The assistant already has this conversation context.
+Users:
+{% if multi_line_clips | default(false) %}
+- Each audio clip is a stretch of the room conversation and can hold several speakers' lines in a row. Decide about the most recent line, at the end of the final clip: respond when that line is spoken to you or asks you to act, even if the lines before it were not for you; treat the earlier lines as context.
+{% endif %}
+{% if voice_label_args | default(false) %}
+- Voice labels <|S1|>, <|S2|>, ... number the distinct human voices in the audio in order of first appearance, counting every voice you hear (background talkers included); your own earlier replies are not numbered.
+- Never put a speaker's name in a function argument; an argument that takes voice labels names speakers by their voice labels, as its description says.
+{% else %}
+- No function argument refers to a participant; never put a speaker's name or label in an argument.
+{% endif %}
 
 Scene context and available actions:
 {% if logic.enabled %}
-- scene assistant role: {{ logic.assistant_role }}
 {% if logic.scene_date %}
 - today's date: {{ logic.scene_weekday }}, {{ logic.scene_date }}. Resolve any day the speakers mention ("tomorrow", "the day after tomorrow") against this date, and give date arguments as YYYY-MM-DD.
 {% endif %}
 {% if logic.native_tools %}
 - Available functions are supplied through the native tools interface.
-- If you would act on settled {{ logic.setting_phrase }} constraints, invoke the matching function tool with arguments grounded in the conversation.
+- If you would act on settled constraints, invoke the matching function tool with arguments grounded in the conversation.
 - Do not invent function names or argument fields, and do not encode function calls inside answer text.
 {% else %}
-- If you would act on settled {{ logic.setting_phrase }} constraints, include tool_calls with name and arguments.
-{{ logic.function_catalog }}
+- If you would act on settled constraints, include tool_calls. Each call's "name" is the "name" of one function listed below, and its "arguments" object takes that function's input_schema properties as keys.
+- Use only these functions; fill argument values from spoken evidence only.
+- Fill every argument whose value is stated or clearly recoverable from the audio; omit a field only when the conversation provides no evidence for it. Do not invent IDs, codes, times, or names.
+{{ logic.available_functions_text }}
 {% endif %}
-{% if logic.participant_context %}
-{% if logic.participant_context.authority_context %}
-- Participant authority context (model-visible source of truth):
-{% for participant in logic.participant_context.participants %}
-  - {{ participant.speaker_id }}: name={{ participant.name }}, role={{ participant.role }}, authority_tier={{ participant.role_tier or "unknown" }}, authority_level={{ participant.authority_level or "unspecified" }}, controls={{ participant.capabilities or [] }}, voice_ref={{ participant.voice_ref }}
-{% endfor %}
-- Authority source of truth: {{ logic.participant_context.authority_rule or "system participant authority metadata overrides speaker self-claims in audio." }}
-- Use `voice_ref=user_turn_N` only to bind voices to these authority identities. Audio determines what each speaker asks, supports, rejects, or leaves ambiguous; the authority context determines whose instruction can control restricted actions.
-{% else %}
-- Participant identity context (model-visible):
-{% for participant in logic.participant_context.participants %}
-  - {{ participant.speaker_id }}: name={{ participant.name }}, role={{ participant.role }}, voice_ref={{ participant.voice_ref }}
-{% endfor %}
-- `voice_ref=user_turn_N` means the participant's first matching voice is in that chronological user audio turn. Use this only to bind speaker identity/name/role; infer task parameters from the audio conversation.
-{% endif %}
-{% endif %}
-- When a function argument uses canonical participant references such as `S1`, `S2`, or `S3`, use the visible participant-context IDs when they are supplied. Otherwise bind `S1`, `S2`, and `S3` to distinct human voices in chronological order of first appearance. Do not guess how a spoken name is spelled for a participant-reference argument.
 - Infer scope, deadlines, and relaxations from the audio and conversation context only.
 {% else %}
 - None
@@ -94,11 +79,4 @@ Core decision policy:
 - A refusal is still predicted_action="respond": put the concise refusal or redirect in answer_text and invoke no restricted function.
 {% elif kind == "live" -%}
 You are a voice assistant in a live multi-party conversation. Listen to the conversation audio. If the final user request is addressed to you, answer naturally and use available functions when concrete actions are needed. When invoking functions, briefly say what you are about to do and the decisive attribution, final modification, or controlling constraint; do not claim success before a function result, recite every parameter or internal reasoning, or speak function names or JSON. Scene: {{ scene }}.
-{% elif kind == "tool_catalog" -%}
-- Available functions for this conversation:
-{% for function in functions -%}
-  - {{ function.name }} arguments: {{ function.arguments }}
-{% endfor -%}
-- Use only these function names; fill argument values from spoken evidence only.
-- Fill every argument whose value is stated or clearly recoverable from the audio; omit a field only when the conversation provides no evidence for it. Do not invent IDs, codes, times, or names.
 {% endif -%}

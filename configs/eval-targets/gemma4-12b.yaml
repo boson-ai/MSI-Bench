@@ -1,0 +1,10 @@
+# Thinking is a request-level chat_template_kwargs toggle; one server covers both.
+base:
+  - name: gemma-4-12b-instruct-thinking
+    provider: local
+    model: gemma-4-12B-it
+    thinking_mode: enabled
+  - name: gemma-4-12b-instruct
+    provider: local
+    model: gemma-4-12B-it
+    thinking_mode: disabled

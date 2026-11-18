@@ -156,3 +156,43 @@ def test_tool_calls_without_a_contract_are_not_scored(tmp_path) -> None:
 
     assert summary["total"] == 0
     assert summary["details"] == {}
+
+
+def test_fuzzy_diagnostics_skip_the_read_only_lookups_the_validator_ignores(tmp_path) -> None:
+    manifest = tmp_path / "manifest.jsonl"
+    predictions = tmp_path / "predictions.jsonl"
+    gold = {"name": "set_alarm", "arguments": {"time": "07:00"}}
+    row = {
+        "cell_id": "c1",
+        "logic_expected_tool_calls": [gold],
+        "logic_tool_validation": {
+            "call_policy": "exact_multiset",
+            "required_calls": [
+                {"name": "set_alarm", "arguments": {"time": {"op": "exact", "value": "07:00"}}}
+            ],
+            "read_only_call_names": ["get_current_time"],
+        },
+    }
+    unstamped = {**row, "cell_id": "c2", "logic_tool_validation": None}
+    _write_jsonl(manifest, [row, unstamped])
+    calls = [{"name": "get_current_time", "arguments": {}}, gold]
+    _write_jsonl(
+        predictions,
+        [
+            {"cell_id": "c1", "predicted_action": "respond", "tool_calls": calls},
+            {"cell_id": "c2", "predicted_action": "respond", "tool_calls": calls},
+        ],
+    )
+
+    details = manifest_eval(manifest, predictions)["logic_tool_call_summary"]["details"]
+
+    assert details["c1"]["validator_passed"] is True
+    assert details["c1"]["predicted_names"] == ["set_alarm"]
+    assert details["c1"]["name_precision"] == 1.0
+    assert details["c1"]["name_multiset_match"] is True
+    assert details["c1"]["tool_validation"]["predicted_call_count"] == 2
+    assert details["c1"]["tool_validation"]["ignored_predicted_indices"] == [0]
+    assert details["c2"]["validator_passed"] is False
+    assert details["c2"]["predicted_names"] == ["get_current_time", "set_alarm"]
+    assert details["c2"]["name_precision"] == 0.5
+

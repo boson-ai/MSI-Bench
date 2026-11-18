@@ -1,0 +1,10 @@
+# Transcript-input (local_text) twins of the gemma4 audio targets.
+base:
+  - name: gemma-4-12b-instruct-thinking-text
+    provider: local_text
+    model: gemma-4-12B-it
+    thinking_mode: enabled
+  - name: gemma-4-12b-instruct-text
+    provider: local_text
+    model: gemma-4-12B-it
+    thinking_mode: disabled

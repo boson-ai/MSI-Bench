@@ -6,11 +6,12 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
-from ib.predictions import PredictionRow, read_predictions
+from ib.scoring.predictions import PredictionRow, read_predictions
 from ib.scoring.smoke import _read_rows, _rubric_references
 from ib.scoring.tool_match import _tool_argument_score, _tool_call_names, _tool_name_scores
 from ib.scoring.tool_validation import (
     TOOL_VALIDATOR_POLICY_VERSION,
+    effective_tool_calls,
     resolve_tool_validation_spec,
     validate_manifest_tool_calls,
 )
@@ -89,30 +90,33 @@ def _probe_action_summary(
     *,
     eval_mode: str,
 ) -> dict[str, Any]:
-    """Return the only action-class denominator: hear-time plus live speak-time probes.
+    """Return the only action-class denominator: rows with an expected class plus live speak-time probes.
 
-    Base semantic cases are intentionally excluded. Their final user turn is
-    answerable by construction; refusal, clarification, incorporation, and
-    other semantic distinctions are judged by atomic answer rubrics instead of
-    the coarse ``predicted_action`` field.
+    Rows get their expected class from _expected_action_class. Other base semantic
+    cases are intentionally excluded. Their final user turn is answerable by
+    construction; refusal, clarification, incorporation, and other semantic
+    distinctions are judged by atomic answer rubrics instead of the coarse
+    ``predicted_action`` field.
     """
 
     details: dict[str, dict[str, Any]] = {}
     correct = 0
     total = 0
     for row in manifest:
-        if row.get("logic_case_mode") == "hear_time_probe":
+        expected_class = _expected_action_class(row)
+        if expected_class is not None:
             cell_id = row.get("cell_id")
             prediction = predictions.get(cell_id) if isinstance(cell_id, str) else None
             predicted = None if prediction is None else prediction.predicted_action.value
             predicted_class = _action_class(predicted)
-            expected_class = "silent"
             format_error = _prediction_format_error(prediction)
             action_correct = predicted_class == expected_class and not format_error
             total += 1
             correct += int(action_correct)
             details[str(cell_id)] = {
-                "probe_type": "hear_time",
+                "probe_type": (
+                    "hear_time" if row.get("logic_case_mode") == "hear_time_probe" else "base"
+                ),
                 "expected_action_class": expected_class,
                 "predicted_action": predicted,
                 "predicted_action_class": predicted_class,
@@ -204,6 +208,17 @@ def _prediction_format_error(prediction: PredictionRow | None) -> bool:
         return False
     metadata = prediction.metadata if isinstance(prediction.metadata, dict) else {}
     return isinstance(metadata.get("provider_error"), dict)
+
+
+def _expected_action_class(row: dict[str, Any]) -> str | None:
+    """Return the action class a manifest row is scored against, or None when it has none.
+
+    hear_time_probe rows expect "silent". Every other row returns None and stays out of
+    the action denominator.
+    """
+    if row.get("logic_case_mode") == "hear_time_probe":
+        return "silent"
+    return None
 
 
 def _action_class(action: str | None) -> str | None:
@@ -475,7 +490,11 @@ def rubric_eval(manifest_path: str | Path, rubrics_path: str | Path) -> dict[str
 def _logic_tool_call_summary(
     manifest: list[dict[str, Any]], predictions: dict[str, PredictionRow]
 ) -> dict[str, Any]:
-    """Return order-insensitive name + argument tool-call diagnostics."""
+    """Return order-insensitive name + argument tool-call diagnostics.
+
+    The fuzzy diagnostics read the effective calls, like the validator: a read-only
+    lookup the validator ignores does not lower a name or argument score either.
+    """
     details: dict[str, dict[str, Any]] = {}
     total = 0
     for row in manifest:
@@ -487,6 +506,8 @@ def _logic_tool_call_summary(
         validation_spec, _validation_source = resolve_tool_validation_spec(row)
         if validation_spec is None:
             continue
+        emitted_calls = predicted_calls
+        predicted_calls = effective_tool_calls(row, emitted_calls)
         raw_expected_calls = row.get("logic_expected_tool_calls")
         fuzzy_applicable = isinstance(raw_expected_calls, list)
         expected_calls = raw_expected_calls if fuzzy_applicable else []
@@ -496,7 +517,7 @@ def _logic_tool_call_summary(
         name_precision, name_recall, name_f1 = _tool_name_scores(expected_names, predicted_names)
         argument_score, matched_pairs = _tool_argument_score(expected_calls, predicted_calls)
         tool_call_score = (0.4 * name_f1) + (0.6 * argument_score)
-        validation = validate_manifest_tool_calls(row, predicted_calls)
+        validation = validate_manifest_tool_calls(row, emitted_calls)
         assert validation is not None
         format_error = _prediction_format_error(prediction)
         if format_error:
