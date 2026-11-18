@@ -9,6 +9,7 @@
 
 ## Updates
 
+- **2026-11-18** v2 leaderboard: GPT Live 1 added (full-duplex streaming protocol, see the v2 results table). v2 tool-call scoring now ignores a call to a read-only tool that the gold does not require; the dataset lists those tools per case in `eval.tool_validation.read_only_call_names`. Existing v2 APR moves by at most 0.3.
 - **2026-11-12** MSI-Bench v2 released: 624 cases, 2 to 4 speakers, a full-duplex floor layer and real room acoustics. Published under `v2/` on the [HuggingFace dataset](https://huggingface.co/datasets/M2cha4l1124/MSI-Bench/tree/main/v2) (CC BY-NC 4.0). v1 stays at the dataset root.
 - **2026-09-21** MSI-Bench v1 released with the paper ([arXiv:2609.24812](https://arxiv.org/abs/2609.24812)): 1,152 cases, 2 or 3 speakers (CC BY 4.0).
 
@@ -100,16 +101,17 @@ thinking enabled. ‡ marks configurations affected by output-format errors.
 
 | Model | APR (±95%) | ARS | Tool | Format errors | Auth. | Discl. | Prior. | Seq. | Scope | Retr. |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Gemini 3.8 Flash † | 41.8 ±3.9 | 61.0 | 45.3 | 0 | 51.0 | 80.8 | 52.9 | 26.0 | 20.2 | 20.2 |
-| GPT Realtime 2.1 (medium) † | 35.3 ±3.7 | 57.0 | 38.0 | 0 | 50.0 | 68.3 | 52.9 | 9.6 | 20.2 | 10.6 |
-| Qwen3-Omni-30B | 21.2 ±3.2 | 40.3 | 22.4 | 39 | 33.7 | 56.7 | 23.1 | 2.9 | 0.0 | 10.6 |
-| GPT Audio Mini | 18.3 ±3.0 | 38.2 | 21.3 | 0 | 33.7 | 47.1 | 23.1 | 1.0 | 1.0 | 3.8 |
-| MiMo-Audio-7B | 12.2 ±2.6 | 34.6 | 11.6 | 15 | 22.1 | 40.4 | 8.7 | 0.0 | 0.0 | 1.9 |
-| Qwen2.5-Omni-7B | 11.9 ±2.5 | 32.0 | 12.4 | 39 | 24.0 | 35.6 | 5.8 | 1.9 | 0.0 | 3.8 |
-| MiMo-Audio-7B † | 11.4 ±2.5 | 34.0 | 11.3 | 48 | 20.2 | 33.7 | 13.5 | 0.0 | 0.0 | 1.0 |
-| Phi-4-Multimodal | 5.9 ±1.9 | 34.5 | 1.1 | 12 | 9.6 | 25.0 | 1.0 | 0.0 | 0.0 | 0.0 |
-| Gemma 4-12B | 3.8 ±1.5 | 23.1 | 1.1 | 2 | 4.8 | 17.3 | 1.0 | 0.0 | 0.0 | 0.0 |
-| Gemma 4-12B † | 3.8 ±1.5 | 21.9 | 1.6 | 0 | 2.9 | 18.3 | 1.0 | 0.0 | 0.0 | 1.0 |
+| Gemini 3.8 Flash † | 41.8 ±3.9 | 60.9 | 45.3 | 0 | 51.0 | 80.8 | 52.9 | 26.0 | 20.2 | 20.2 |
+| GPT Realtime 2.1 (medium) † | 35.4 ±3.7 | 57.2 | 38.3 | 0 | 51.0 | 68.3 | 52.9 | 9.6 | 20.2 | 10.6 |
+| GPT Live 1 ‡ | 26.8 ±3.5 | 50.5 | 30.2 | 0 | 39.4 | 69.2 | 42.3 | 2.9 | 4.8 | 1.9 |
+| Qwen3-Omni-30B | 21.2 ±3.2 | 41.5 | 22.4 | 39 | 33.7 | 56.7 | 23.1 | 2.9 | 0.0 | 10.6 |
+| GPT Audio Mini | 18.6 ±3.0 | 39.7 | 21.6 | 0 | 34.6 | 48.1 | 23.1 | 1.0 | 1.0 | 3.8 |
+| MiMo-Audio-7B | 12.5 ±2.6 | 35.6 | 11.6 | 15 | 23.1 | 41.3 | 8.7 | 0.0 | 0.0 | 1.9 |
+| Qwen2.5-Omni-7B | 12.0 ±2.6 | 33.1 | 12.4 | 39 | 24.0 | 36.5 | 5.8 | 1.9 | 0.0 | 3.8 |
+| MiMo-Audio-7B † | 11.4 ±2.5 | 34.6 | 11.3 | 48 | 20.2 | 33.7 | 13.5 | 0.0 | 0.0 | 1.0 |
+| Phi-4-Multimodal | 5.9 ±1.9 | 34.8 | 1.1 | 12 | 9.6 | 25.0 | 1.0 | 0.0 | 0.0 | 0.0 |
+| Gemma 4-12B | 3.8 ±1.5 | 23.7 | 1.1 | 2 | 4.8 | 17.3 | 1.0 | 0.0 | 0.0 | 0.0 |
+| Gemma 4-12B † | 3.8 ±1.5 | 22.2 | 1.6 | 0 | 2.9 | 18.3 | 1.0 | 0.0 | 0.0 | 1.0 |
 | Qwen2-Audio-7B | 0.2 ±0.4 | 14.4 | 0.0 | 0 | 0.0 | 1.0 | 0.0 | 0.0 | 0.0 | 0.0 |
 
 Protocol: Gemini and GPT Audio through native tool calling (Gemini with its
@@ -118,6 +120,18 @@ medium, open-weight models through vLLM with schema-constrained decoding
 (`IB_LOCAL_GUIDED_JSON=1`); one audio message per room block, earlier assistant
 replies as text; judge gpt-6-luna. † thinking or reasoning enabled. Format
 errors are cases with no parseable prediction (counted as failures).
+
+‡ GPT Live 1 (`gpt-live-1`) is full-duplex and takes no pre-cut turns. Each
+case's room audio is streamed in real time on the recorded timeline and the
+model decides when to speak. Tools sit on a GPT-6 Luna backend (Responses
+delegation); every function call is answered "accepted, not completed". The
+scored answer is what the model says from the start of the last target line;
+the scored tool calls are those of the whole session. One run.
+
+Tool calls (all models): a call to a tool listed in the case's
+`eval.tool_validation.read_only_call_names` is ignored when the gold does not
+require it, by the validator and by the judge. Every other call must match
+the gold exactly.
 
 </details>
 
